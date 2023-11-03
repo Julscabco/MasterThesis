@@ -1,0 +1,5 @@
+# Ignoring python file for silly tests
+Predictive model/Test.py
+
+# Ignoreing idea folder created by PyCharm
+.idea/
