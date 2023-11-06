@@ -6,6 +6,7 @@ Created on Thu Oct 26 16:35:15 2023
 """
 
 import os
+import time as pytime
 
 import numba
 import math
@@ -18,7 +19,7 @@ def get_linear_burst(t, tlim, a):
     if t < tlim:
         return 1.0
     elif t >= tlim:
-        return a * t
+        return a * t - a*tlim
 
 
 def taul_to_minutes(t, n, k):
@@ -44,7 +45,6 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     # how many units of nutrients do we have?
     nutrients = int(n0 * V)
-    print('nutrients',nutrients)
     gnmax = np.log(2.0) / doubling_time
     kn = n0 / 5.0
 
@@ -77,6 +77,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     iteration = 0
 
+    start_time = pytime.time()
     for n in range(0, niter):
 
         # Probability of infection at this time taking into account actual Np
@@ -85,7 +86,9 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         sum_probs = prob_superinfection + prob_new_timer
 
         # We iterate over the already infected cells
-        for i in np.where(states == 1)[0]:
+        infected_indices = np.where(states == 1)[0]
+
+        for i in infected_indices:
             r = np.random.uniform()
             if r < prob_new_timer:
                 Nt[i] = Nt[i] + 1
@@ -95,11 +98,13 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                     Np = Np + int(get_linear_burst(tau, 15.0, 1.0))
                     states[i] = 2
 
+                    """
                     # We delete the dead cells from all the variables dependent on the number of bacteria
                     np.delete(states, i)
                     np.delete(infection_time, i)
                     np.delete(sizes, i)
                     np.delete(Nt, i)
+                    """
 
             elif prob_new_timer < r < sum_probs:
                 if Np > 0:
@@ -165,7 +170,10 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         if np.mod(iteration, 1000) == 0.0:
             print(Nb)
 
-    return time, phages, bacteria, nut
+
+    compilation_time = pytime.time()-start_time
+
+    return time, phages, bacteria, nut, compilation_time
 
 
 # The time units are (n/k) which is tau_l
@@ -174,20 +182,22 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 delta_t = 0.01
 Nb0 = 50
 B = 1.0e6
-P0 = 0
+P = 1.0e6
 N = 60
 k = 6.0
 nd = 30
-nu = 5.0e-9
+nu = 5.0e-10
 n0 = 1.0e9
 
 # The doubling time in minutes
 doubling_time_mins = 20.0
 doubling_time = minutes_to_taul(doubling_time_mins, N, k)
-niter = 5000
+niter = 20000
 
-time_vector, nphages, nbacteria, nnutrients = system_evolution_nlg(delta_t, Nb0, B, P0, N, k, nd, nu, n0, doubling_time, niter)
 
+time_vector, nphages, nbacteria, nnutrients, compilation_time = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+
+print('THE CODE LASTED'+str(compilation_time)+'SECONDS')
 save_plot = False
 time_mins = [taul_to_minutes(t, N, k) for t in time_vector]
 

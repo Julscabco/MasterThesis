@@ -127,7 +127,7 @@ def get_initial_number_of_phage(mosi,nu,B,ti_superinfection,len_superinfection):
 def Nb_bacteria_lysis_3(deltat, Nb, N = 60,nd = 33,k = 6.0,MOSI=7.6, ti_superinfection=15.0,len_superinfection=3.0,burst_size=10):
     
     nu = 5.0e-9
-    B = 2.0e7
+    B = 1.0e6
     
     # Volume of the system
     V = Nb/B
@@ -199,7 +199,7 @@ def Nb_bacteria_lysis_3(deltat, Nb, N = 60,nd = 33,k = 6.0,MOSI=7.6, ti_superinf
 
 delta_t = 0.01
 ndata = 20000
-mosi = 0.4
+mosi = 7.6
 ti= 15.0
 length =3.0
 k = 6.0
@@ -216,7 +216,7 @@ t =  Nb_bacteria_lysis_3(deltat = delta_t, Nb = Nb, N = n, nd=nd, k = k, MOSI=mo
 
 
 output_file= str(delta_t)+'_'+str(Nb)+'_'+str(n)+'_'+str(int(k))+'_'+ str(nd)+'_'+str(mosi)+'_'+str(int(ti))+'_'+str(int(length))+'_'+str(burst)
-file_path = os.path.join(os.getcwd(),'CollectiveConstantInterval2_data',output_file)
+file_path = os.path.join(os.getcwd(),'Nu_exploring_CollectiveTimeInterval',output_file)
 print(output_file)
 
 f = open(file_path, "a")
