@@ -34,6 +34,7 @@ def minutes_to_taul(t, n, k):
 def monod_growth_law(c, kn, gnmax=0.034):
     return gnmax * c / (kn + c)
 
+def euler_bacterial_growth()
 
 @numba.jit
 def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter):
@@ -47,6 +48,9 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     nutrients = int(n0 * V)
     gnmax = np.log(2.0) / doubling_time
     kn = n0 / 5.0
+    
+    # What is the maximum size that cells can achieve?
+    max_size = 5
 
     # Initialization of vectors that contain information about bacteria
     states = np.zeros(Nb0, dtype=np.int8)
@@ -95,7 +99,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 # print('New timer')
                 if Nt[i] >= N:
                     tau = t - infection_time[i]
-                    Np = Np + int(get_linear_burst(tau, 15.0, 1.0))
+                    Np = Np + int(get_linear_burst(tau, 15.0, 100.0))
                     states[i] = 2
 
                     """
@@ -121,16 +125,12 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
         # We calculate concentration of nutrients and growth rate
         nn = float(nutrients)/V
-
         alpha = monod_growth_law(c=nn, kn=kn, gnmax=gnmax)
         if alpha <= 0.0:
             alpha = 0.0
 
-        # Probability of growth
-        prob_division = alpha * delta_t
-
-        # Probability of nutrient consumption
-        prob_ingestion = alpha * delta_t
+        # probability of growing
+        prob_growth = alpha 
 
         # We iterate over the non infected cells to see if they get infected
         non_infected_indices = np.where(states == 0)[0]
@@ -145,17 +145,22 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 # Wr store their infection time
                 infection_time[i] = t
 
-            elif prob_infection < r < (prob_infection + prob_division):
+            elif prob_infection < r < prob_growth:
+                
+                if sizes[i] >= max_size:
+                    print('new cell')
+                    # We re-initialize all vectors that depend on Nb
+                    states = np.append(states, 0)
+                    infection_time = np.append(infection_time, 0.0)
+                    Nt = np.append(Nt, 0)
+                    sizes = np.append(sizes, 0)
+                    
+                    sizes[i] = 0
+                else:
+                    sizes[i] = sizes[i] + 1
+                    if nutrients>0:
+                        nutrients = nutrients - 1
 
-                # We re-initialize all vectors that depend on Nb
-                states = np.append(states, 0)
-                infection_time = np.append(infection_time, 0.0)
-                Nt = np.append(Nt, 0)
-
-            elif (prob_infection + prob_division) < r < (prob_infection + prob_division + prob_ingestion):
-                # One nutrient is consumed
-                if nutrients > 0:
-                    nutrients = nutrients - 100
 
 
         Nb = len(np.where(states == 0)[0]) + len(np.where(states == 1)[0])
@@ -173,7 +178,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     compilation_time = pytime.time()-start_time
 
-    return time, phages, bacteria, nut, compilation_time
+    return time, phages, bacteria, nut, compilation_time, sizes
 
 
 # The time units are (n/k) which is tau_l
@@ -182,49 +187,50 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 delta_t = 0.01
 Nb0 = 50
 B = 1.0e6
-P = 1.0e6
+P = 0.0
 N = 60
 k = 6.0
 nd = 30
 nu = 5.0e-10
-n0 = 1.0e9
+n0 = 1.0e7
 
 # The doubling time in minutes
 doubling_time_mins = 20.0
 doubling_time = minutes_to_taul(doubling_time_mins, N, k)
-niter = 20000
+niter = 3000
 
 
-time_vector, nphages, nbacteria, nnutrients, compilation_time = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+time_vector, nphages, nbacteria, nnutrients, compilation_time, cell_sizes= system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
 
 print('THE CODE LASTED'+str(compilation_time)+'SECONDS')
 save_plot = False
 time_mins = [taul_to_minutes(t, N, k) for t in time_vector]
+time_hours = [(i/60.0) for i in time_mins]
 
-fig, ax = plt.subplots(3, 1, figsize=(10, 6))
+fig, ax = plt.subplots(3, 1, figsize=(10, 10))
 
-ax[0].plot(time_mins, nphages, label='Phage')
+ax[0].plot(time_hours, nphages, label='Phage')
 ax[0].set_title(r'$\Delta t=$' + str(delta_t) + ', ' + r'${N}_{iter}$=' + str(niter)
                 + ', ' + r'${N}_{b0}=$' + str(Nb0))
 ax[0].set_ylabel('Number of phage')
 
-ax[0].set_xlim(0.0,time_mins[-1])
+ax[0].set_xlim(0.0,time_hours[-1])
 
-ax[1].plot(time_mins, nbacteria, label='Bacteria', color='orange')
+ax[1].plot(time_hours, nbacteria, label='Bacteria', color='orange')
 
 
 ax[1].set_ylabel('Number of bacteria')
 
-ax[1].set_xlim(0.0,time_mins[-1])
+ax[1].set_xlim(0.0,time_hours[-1])
 
-ax[2].plot(time_mins, nnutrients)
-ax[2].set_xlabel('Time (mins)')
+ax[2].plot(time_hours, nnutrients)
+ax[2].set_xlabel('Time (h)')
 ax[2].set_ylabel('Concentration of nutrients')
-ax[2].set_xlim(0.0,time_mins[-1])
+ax[2].set_xlim(0.0,time_hours[-1])
 
 if save_plot == True:
     figure_path = os.path.join(os.getcwd(), 'FIGURES', 'First figures')
-    figure_name = 'NLG_' + str(delta_t) + '_' + str(niter) + '_' + str(Nb0) + '_' + str(P0) + '.png'
+    figure_name = 'NLG_' + str(delta_t) + '_' + str(niter) + '_' + str(Nb0)+ '.png'
     fig.savefig(os.path.join(figure_path, figure_name))
 
 # We plot the concentration of bacteria as a function of time 
@@ -234,7 +240,7 @@ save_plot = False
 exponential = [B * np.exp((0.034) * i) for i in time_mins]
 
 fig, ax = plt.subplots()
-ax.scatter(time_mins, nbacteria, label='Simulation')
+ax.plot(time_mins, nbacteria, label='Simulation')
 ax.plot(time_mins, exponential, linestyle='dashed', color='red', label=r'${B}_{0}{e}^{0.034 t}$')
 ax.set_xlabel('Time')
 ax.set_ylabel('Concentration of bacteria')

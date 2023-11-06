@@ -1,0 +1,21 @@
+REFERENCE 13 2020
+1- DNA of superinfection phages binds non-specifically to the R-T complex making it more stable. 
+2- Free R protein cristalizes in some way that works as a sink for the later released R proteins from the
+	complex R-T, ensuring efficient lysis
+
+REFERENCE 18 1967
+- Abstract: with increasing rate of superinfection, the length of lysis delay decreased
+- They state that Doerman found the length of the delay of the lysis to be constant and independent of the time
+	of superinfection (2). But, Ruteberg and Ruteberg, found that the length of the delay increased when they 	increased the interval between primary and superinfection.
+- infection rate: phages adsorbed per minute and per tota phages adsorbed during the entire infection period
+- DISCUSSION: The length of lysis delay is primarily determined by the MOSI (multiplicity of Superinfection) and in 	less measure by the time of the first superinfection
+	- An increase of the rate of superinfection can reduce the efficiency of superinfection
+	- Superinfection reduces the leak of ATP to 0.5 in the latent period. At some point when there is no more 
+	ATP the membrane mught desintegrate and let endolysin eat the wall.
+
+REFERENCE 19 (1999)
+- Ulrik makes reference to it to show that the burst size is difficult to predict. 
+- Ask for the difference in the two kinds of cells they use. Ulrik does not say they are different. Are they?
+
+
+
