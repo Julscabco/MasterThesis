@@ -6,7 +6,7 @@ def monod_growth_law(c, kn, gnmax=0.034):
 
 
 
-gnmax = 0.079
+gnmax = 0.034
 n0 = 1.0e9
 kn = n0/5.0
 
@@ -36,10 +36,14 @@ def nutrient_integral(gmax,B,n0,delta_t,tmax):
 
     
     
-t,nutrients,bacteria = nutrient_integral(gnmax,1.0e6,n0,0.01,70.0)
+t,nutrients,bacteria = nutrient_integral(gnmax,1.0e6,n0,0.01,300.0)
 
 plt.figure()
 plt.plot(t,nutrients)
+plt.xlabel('Time (mins)')
+plt.ylabel('Nutrients concentration')
 
 plt.figure()
 plt.plot(t,bacteria)
+plt.xlabel('Time (mins)')
+plt.ylabel('bacterial concentration')
