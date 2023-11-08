@@ -14,7 +14,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+@numba.jit(nopython=True)
 def get_linear_burst(t, tlim, a):
     if t < tlim:
         return 1.0
@@ -30,7 +30,7 @@ def minutes_to_taul(t, n, k):
     return t * (float(n) / float(k)) / 23.0
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def monod_growth_law(c, kn, gnmax=0.034):
     return gnmax * c / (kn + c)
 
@@ -46,33 +46,36 @@ def nutrient_integral(gmax,B,n0,delta_t,tmax):
     b[0] = B
 
     for ite in range(1,niter):
-        n[ite] =  n[ite -1] - 1.0*b[ite-1]*monod_growth_law(n[ite-1],n0/5.0,gmax)*delta_t
+        n[ite] =  n[ite -1] - (1.0)*b[ite-1]*monod_growth_law(n[ite-1],n0/5.0,gmax)*delta_t
         b[ite] = b[ite-1] + monod_growth_law(n[ite-1],n0/5.0,gmax)*b[ite-1]*delta_t
         time[ite] = time[ite-1] + delta_t
         
     return time,n,b
 
-@numba.jit
+@numba.njit
 def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter):
     # Volume of the system
-    V = float(Nb0) / float(B)
+    V = np.float64(Nb0 / B)
 
     # How many phages do we have in this voalume according to the initial concentration?
-    Np0 = int(P * V)
+    Np0 = np.float64(P * V)
 
     # how many units of nutrients do we have?
-    nutrients = int(n0 * V)
+    nutrients = n0 * V
     gnmax = np.log(2.0) / doubling_time
     kn = n0 / 5.0
     
     # What is the maximum size that cells can achieve?
-    max_size = 10.0
+    max_size = int(10)
 
     # Initialization of vectors that contain information about bacteria
-    states = np.zeros(Nb0, dtype=np.int8)
-    infection_time = np.zeros(Nb0, dtype=np.float16)
-    sizes = np.zeros(Nb0)
-    Nt = np.zeros(Nb0, dtype=np.int8)
+    states = np.zeros(Nb0, dtype=np.int64)
+    infection_time = np.zeros(Nb0, dtype=np.float64)
+    Nt = np.zeros(Nb0, dtype=np.int64)
+    
+    sizes = np.zeros(Nb0,dtype=np.int64)
+    for j in range(0,Nb0):
+        sizes[j] = np.random.randint(0,max_size)
 
     # Initialization of vectors that grow with time steps
     time = []
@@ -94,48 +97,37 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     # probability of new timer molecules for infected bacteria
     prob_new_timer = k * delta_t
+    prob_infection = 0.0
 
     iteration = 0
+    
+    n = 0
 
-    start_time = pytime.time()
-    for n in range(0, niter):
-
-        # Probability of infection at this time taking into account actual Np
-        prob_infection = (nu * delta_t * (float(Np) / V))
-        prob_superinfection = (nu * delta_t * (float(Np) / V))
-        sum_probs = prob_superinfection + prob_new_timer
+    while n<niter:
 
         # We iterate over the already infected cells
         infected_indices = np.where(states == 1)[0]
-
-        for i in infected_indices:
-            r = np.random.uniform()
+        
+        for ii in infected_indices:
+            r = np.random.rand()
             if r < prob_new_timer:
-                Nt[i] = Nt[i] + 1
+                Nt[ii] += np.int8(1)
                 # print('New timer')
-                if Nt[i] >= N:
-                    tau = t - infection_time[i]
+                if Nt[ii] >= N:
+                    tau = t - infection_time[ii]
                     Np = Np + int(get_linear_burst(tau, 15.0, 100.0))
-                    states[i] = 2
+                    states[ii] = 2
 
-                    """
-                    # We delete the dead cells from all the variables dependent on the number of bacteria
-                    np.delete(states, i)
-                    np.delete(infection_time, i)
-                    np.delete(sizes, i)
-                    np.delete(Nt, i)
-                    """
-
-            elif prob_new_timer < r < sum_probs:
+            elif prob_new_timer < r < prob_new_timer + nu * delta_t * Np / V:
                 if Np > 0:
                     Np = Np - 1
                 else:
                     Np = 0
 
-                if Nt[i] < nd:
-                    Nt[i] = 0
-                elif Nt[i] >= nd:
-                    Nt[i] = Nt[i] - nd
+                if Nt[ii] < nd:
+                    Nt[ii] = 0
+                elif Nt[ii] >= nd:
+                    Nt[ii] = Nt[ii] - nd
 
 
 
@@ -145,25 +137,24 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         if alpha <= 0.0:
             alpha = 0.0
         
-        proportionality_factor = 1.0
+        Y = 1.5
         # probability of growing
-        prob_growth = alpha*delta_t*max_size*proportionality_factor
+        prob_growth = alpha*delta_t*max_size*Y
     
 
         # We iterate over the non infected cells to see if they get infected
         non_infected_indices = np.where(states == 0)[0]
 
         for i in non_infected_indices:
-            r = np.random.uniform()
+            r = np.random.rand()
             if r < prob_infection:
-                # print('first infection')
                 # They are infected now
                 states[i] = 1
                 Np = Np - 1
                 # We store their infection time
                 infection_time[i] = t
 
-            elif prob_infection < r < (prob_infection + prob_growth):
+            elif nu * delta_t * (Np / V)< r < (nu * delta_t * (Np / V) + prob_growth):
                 
                 if sizes[i] >= max_size:
                     # We re-initialize all vectors that depend on Nb
@@ -173,11 +164,11 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                     sizes = np.append(sizes, 0)
                     
                     sizes[i] = 0
-                else:
-                    print('here')
-                    sizes[i] = sizes[i] + 1
-                    if nutrients>0:
-                        nutrients = nutrients - 1.0/(max_size*proportionality_factor)
+                else: 
+                    if nutrients>0.0:
+                        sizes[i] = sizes[i] + 1
+                        nutrients = nutrients - 1.0/(max_size*Y)
+
 
 
 
@@ -193,17 +184,15 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         if np.mod(iteration, 1000) == 0.0:
             print(Nb)
 
+        n = n + 1
 
-    compilation_time = pytime.time()-start_time
+    return time, phages, bacteria, nut
 
-    return time, phages, bacteria, nut, compilation_time, sizes
-
+""" ------- PARAMETERS ------- """
 
 # The time units are (n/k) which is tau_l
-# ULRIK'S PARAMETERS
-
 delta_t = 0.01
-Nb0 = 50
+Nb0 = int(50)
 B = 1.0e6
 P = 0.0
 N = 60
@@ -215,12 +204,20 @@ n0 = 1.0e7
 # The doubling time in minutes
 doubling_time_mins = 20.0
 doubling_time = minutes_to_taul(doubling_time_mins, N, k)
-niter = 6000
 
 
-time_vector, nphages, nbacteria, nnutrients, compilation_time, cell_sizes= system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+"""------------ NUMBA COMPILATION -------------"""
+# We call the function with just one iteration so that numba does the compilation
+niter = 1
+_, _, _, _ = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
 
-print('THE CODE LASTED'+str(compilation_time)+'SECONDS')
+""" ---------- ACTUAL SIMULATION ------------- """
+niter = np.int64(6000)
+
+start = pytime.time()
+time_vector, nphages, nbacteria, nnutrients = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+print(pytime.time()-start)
+
 save_plot = False
 time_mins = [taul_to_minutes(t, N, k) for t in time_vector]
 time_hours = [(i/60.0) for i in time_mins]
@@ -274,19 +271,14 @@ t,nutrients,bacteria = nutrient_integral(0.034,1.0e6,n0,time_mins[1]-time_mins[0
     
     
 fig, ax = plt.subplots()
-ax.plot(time_mins[:-2], bacteria, label = 'B(t)')
-ax.plot(time_mins, nbacteria, label='Simulation')
-ax.set_xlabel('time (mins)')
-ax.set_ylabel('Bacteria concentration (ml-1)')
+ax.plot(time_mins[:-2], bacteria, label = 'B(t)',linestyle='dashed',color='black')
+ax.plot(time_mins, nbacteria, label='Simulated B(t)',color='black')
+ax.plot(time_mins[:-2], nutrients, label = 'n(t)',linestyle='dashed',color='red')
+ax.plot(time_mins, nnutrients, label='Simulated n(t)',color='red')
+ax.set_xlabel('time (min)')
+ax.set_ylabel('Concentration (ml-1)')
 ax.legend(loc='best')
 
-
-fig, ax = plt.subplots()
-ax.plot(time_mins[:-2], nutrients, label = 'n(t)')
-ax.plot(time_mins, nnutrients, label='Simulation')
-ax.set_xlabel('time (mins)')
-ax.set_ylabel('Bacteria concentration (ml-1)')
-ax.legend(loc='best')
 
 plt.show()
 
