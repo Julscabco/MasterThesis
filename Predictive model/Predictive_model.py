@@ -1,172 +1,146 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Oct 12 15:55:23 2023
+Created on Thu Oct 26 16:35:15 2023
 
 @author: Usuario
 """
-import os 
 
+import os
 import numba
+
 import numpy as np
-import matplotlib.pyplot as plt
+
+from Utils import get_linear_burst, monod_growth_law
 
 
-def get_linear_burst(t,tlim,a):
-    if t<tlim:
-        return 1.0
-    elif t>=tlim:
-        return a*t
 
-@numba.jit    
-def system_evolution(delta_t,Nb0,B,Np0,alpha,mmax,N,k,nd,nu,niter):
-    
+@numba.njit
+def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter):
     # Volume of the system
-    V = float(Nb0)/float(B)
+    V = np.float64(Nb0 / B)
+
+    # How many phages do we have in this voalume according to the initial concentration?
+    Np0 = np.float64(P * V)
+
+    # how many units of nutrients do we have?
+    nutrients = n0 * V
+    gnmax = np.log(2.0) / doubling_time
+    kn = n0 / 5.0
     
+    # What is the maximum size that cells can achieve?
+    max_size = int(10)
+
     # Initialization of vectors that contain information about bacteria
-    states = np.zeros(Nb0,dtype=np.int8)
-    infection_time = np.zeros(Nb0, dtype=np.float16)
-    sizes = np.ones(Nb0, dtype=np.float16)
-    Nt = np.zeros(Nb0, dtype=np.int8)
+    states = np.zeros(Nb0, dtype=np.int64)
+    infection_time = np.zeros(Nb0, dtype=np.float64)
+    Nt = np.zeros(Nb0, dtype=np.int64)
     
-    
+    sizes = np.zeros(Nb0,dtype=np.int64)
+    for j in range(0,Nb0):
+        sizes[j] = np.random.randint(0,max_size)
+
     # Initialization of vectors that grow with time steps
     time = []
     phages = []
     bacteria = []
-    
-    #We store the first values of the concentratioin of bacteria and phage
-    bacteria.append(float(Nb0)/float(V))
-    phages.append(float(Np0)/float(V))
-    
+    nut = []
+
+    # We store the first values of the concentratioin of bacteria and phage
+    bacteria.append(float(Nb0))
+    phages.append(float(Np0))
+    nut.append(nutrients)
+
     # We initialize time
     t = 0.0
     time.append(t)
-    
+
     # We initialize the number of phages
     Np = Np0
-    
+
     # probability of new timer molecules for infected bacteria
-    prob_new_timer = k*delta_t
+    prob_new_timer = k * delta_t
+
     
-    iteration = 0
-    
-    for n in range(0,niter):
-        
-        # we count the infected and uninfected bacteria
-        n_infected = len(np.where(states==1)[0])
-        n_uninfected = len(np.where(states==0)[0])
-        Nb = n_infected + n_uninfected
-        
-        # Probability of infection at this time step
-        prob_infection = (nu*delta_t*(float(Np)/V))
-        prob_superinfection = (nu*delta_t*(float(Np)/V))
-        sum_probs = prob_superinfection + prob_new_timer
-        
+    n = 0
+
+    while n<niter:
+
         # We iterate over the already infected cells
-        for i in np.where(states==1)[0]:
-            r = np.random.uniform()
+        infected_indices = np.where(states == 1)[0]
+        
+        prob_infection = nu * delta_t * Np / V
+        
+        for ii in infected_indices:
+            r = np.random.rand()
             if r < prob_new_timer:
-                Nt[i] = Nt[i] + 1
-                #print('New timer')
-                if Nt[i] >= N:
-                    tau = t - infection_time[i]
-                    Np = Np + int(get_linear_burst(tau,15.0,1.0))
-                    states[i] = 2
-                    print('death',iteration,Nt[i],sizes[i],tau,int(get_linear_burst(tau,15.0,1.0)))
-                    
-                    # We delete the dead cells from all the variables dependent on the number of bacteria
-                    np.delete(states,i)
-                    np.delete(infection_time,i)
-                    np.delete(sizes,i)
-                    np.delete(Nt,i)
-                    
-            elif prob_new_timer < r < sum_probs:
+                Nt[ii] += np.int8(1)
+                if Nt[ii] >= N:
+                    tau = t - infection_time[ii]
+                    Np = Np + int(get_linear_burst(tau, 15.0, 100.0))
+                    states[ii] = 2
+
+            elif prob_new_timer < r < prob_new_timer + prob_infection:
                 if Np > 0:
                     Np = Np - 1
                 else:
                     Np = 0
-                    
-                if Nt[i] < nd:
-                    Nt[i] = 0 
-                elif Nt[i] >= nd:
-                    Nt[i] = Nt[i] - nd
-            
+
+                if Nt[ii] < nd:
+                    Nt[ii] = 0
+                elif Nt[ii] >= nd:
+                    Nt[ii] = Nt[ii] - nd
+
+
+
+        # We calculate concentration of nutrients and growth rate
+        nn = float(nutrients)/V
+        alpha = monod_growth_law(c=nn, kn=kn, gnmax=gnmax)
+        if alpha <= 0.0:
+            alpha = 0.0
         
+        Y = 1.5
+        # probability of growing
+        prob_growth = alpha*delta_t*max_size*Y
+    
+
         # We iterate over the non infected cells to see if they get infected
-        for i in np.where(states==0)[0]:
-            r = np.random.uniform()
-            if r<prob_infection:
-                #print('first infection')
+        non_infected_indices = np.where(states == 0)[0]
+
+        for i in non_infected_indices:
+            r = np.random.rand()
+            if r < prob_infection:
                 # They are infected now
                 states[i] = 1
-                Np = Np-1
-                # Wr store their infection time
+                Np = Np - 1
+                # We store their infection time
                 infection_time[i] = t
-            else:
-                # If the cell is too big it divides otherwise just grows
-                if sizes[i]>=mmax:
-                    #print('division',iteration)
-                    # The cell that has divided has a new size
-                    sizes[i] = 1.0
-                    # We initialize all vectors that depend on Nb
-                    sizes = np.append(sizes,1.0)
-                    states = np.append(states,0)
-                    infection_time = np.append(infection_time,0.0)
-                    Nt = np.append(Nt,0)
+
+            elif nu * delta_t * (Np / V)< r < (prob_infection + prob_growth):
+                
+                if sizes[i] >= max_size:
+                    # We re-initialize all vectors that depend on Nb
+                    states = np.append(states, 0)
+                    infection_time = np.append(infection_time, 0.0)
+                    Nt = np.append(Nt, 0)
+                    sizes = np.append(sizes, 0)
                     
-                elif sizes[i]<mmax:
-                    # We make the cell grow on size
-                    sizes[i] = sizes[i] + alpha*delta_t
-                    
-        
+                    sizes[i] = 0
+                else: 
+                    if nutrients>0.0:
+                        sizes[i] = sizes[i] + 1
+                        nutrients = nutrients - 1.0/(max_size*Y)
+
+
+
         t = t + delta_t
-        phages.append(float(Np)/V)
+        phages.append((Np))
         time.append(t)
-        bacteria.append(float(len(np.where(states==0)[0]) + len(np.where(states==1)[0]))/V)
+        bacteria.append((len(np.where(states == 0)[0]) + len(np.where(states == 1)[0])))
+        nut.append((nutrients))
 
-        
-        iteration = iteration + 1
+        n = n + 1
 
-                    
-    return time,phages,bacteria
+    return time, phages, bacteria, nut
 
-
-delta_t = 0.01
-initial_nbacteria = 100
-bacteria_concentration = 2.0e7
-initial_nphages = 10
-alpha = 100.0
-mmax = 2000.0
-N = 60
-k = 6.0
-nd = 30
-nu = 5.0e-9
-
-niter=500000
-
-time_vector,nphages,nbacteria = system_evolution(delta_t, initial_nbacteria, bacteria_concentration,
-                                                 initial_nphages, alpha, mmax, N, k, nd, nu, niter)
-
-save_plot = False
-
-fig, ax = plt.subplots(2,1,figsize=(10,6))
-
-ax[0].plot(time_vector,nphages,label='Phage')
-ax[0].set_title(r'$\Delta t=$' + str(delta_t) + ', ' + r'${N}_{iter}$=' + str(niter)
-          +', ' + r'$\alpha=$' + str(alpha)+ ', ' + r'${N}_{b0}=$' +str(initial_nbacteria)+
-          ', ' + r'${N}_{p0}=$' + str(initial_nphages))
-ax[0].set_ylabel('Number of phage')
-
-ax[1].plot(time_vector,nbacteria,label='Bacteria',color='orange')
-
-ax[1].set_xlabel('Time')
-ax[1].set_ylabel('Number of bacteria')
-
-
-if save_plot == True:
-    figure_path = os.path.join(os.getcwd(),'FIGURES','First figures')
-    figure_name = str(delta_t)+'_'+str(niter)+'_'+str(initial_nbacteria)+'_'+str(initial_nphages)+'.png'
-    fig.savefig(os.path.join(figure_path,figure_name))
 
 
