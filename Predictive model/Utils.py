@@ -14,11 +14,11 @@ import numpy as np
 @numba.jit(nopython=True)
 def get_linear_burst(t, tlim, a):
     if t < tlim:
-        return 1.0
+        return 0.0
     elif t >= tlim:
         return a * t - a*tlim
 
-
+@numba.jit(nopython=True)
 def taul_to_minutes(t, n, k):
     return t * (float(k) / float(n)) * 23.0
 

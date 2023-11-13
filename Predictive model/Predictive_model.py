@@ -5,12 +5,11 @@ Created on Thu Oct 26 16:35:15 2023
 @author: Usuario
 """
 
-import os
 import numba
 
 import numpy as np
 
-from Utils import get_linear_burst, monod_growth_law
+from Utils import get_linear_burst, monod_growth_law, minutes_to_taul, taul_to_minutes
 
 
 
@@ -32,8 +31,11 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     # Initialization of vectors that contain information about bacteria
     states = np.zeros(Nb0, dtype=np.int64)
-    infection_time = np.zeros(Nb0, dtype=np.float64)
+    first_infection_time = np.zeros(Nb0, dtype=np.float64)
     Nt = np.zeros(Nb0, dtype=np.int64)
+    infection_times = np.zeros(1, dtype=np.float64)
+    infected_cell = np.zeros(1, dtype=np.int64)
+    lysis_times = np.zeros(Nb0, dtype=np.float64)
     
     sizes = np.zeros(Nb0,dtype=np.int64)
     for j in range(0,Nb0):
@@ -45,10 +47,13 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     bacteria = []
     nut = []
 
+
     # We store the first values of the concentratioin of bacteria and phage
     bacteria.append(float(Nb0))
     phages.append(float(Np0))
     nut.append(nutrients)
+
+    
 
     # We initialize time
     t = 0.0
@@ -75,11 +80,19 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
             if r < prob_new_timer:
                 Nt[ii] += np.int8(1)
                 if Nt[ii] >= N:
-                    tau = t - infection_time[ii]
-                    Np = Np + int(get_linear_burst(tau, 15.0, 100.0))
+                    tau = t - first_infection_time[ii]
+                    tau_mins = taul_to_minutes(tau,N,k)
+                    Np = Np + int(get_linear_burst(tau_mins, 15.0, 10.0))
                     states[ii] = 2
+                    
+                    lysis_times[ii] = tau_mins
+                    
 
             elif prob_new_timer < r < prob_new_timer + prob_infection:
+                
+                infection_times = np.append(infection_times,t)
+                infected_cell = np.append(infected_cell,ii)
+                
                 if Np > 0:
                     Np = Np - 1
                 else:
@@ -98,7 +111,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         if alpha <= 0.0:
             alpha = 0.0
         
-        Y = 1.5
+        Y = 1.35
         # probability of growing
         prob_growth = alpha*delta_t*max_size*Y
     
@@ -113,22 +126,26 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 states[i] = 1
                 Np = Np - 1
                 # We store their infection time
-                infection_time[i] = t
+                first_infection_time[i] = t
+                infection_times = np.append(infection_times,t)
+                infected_cell = np.append(infected_cell,i)
 
-            elif nu * delta_t * (Np / V)< r < (prob_infection + prob_growth):
+            elif prob_infection< r < (prob_infection + prob_growth):
+                
+                if sizes[i] < max_size: 
+                    if nutrients>0.0:
+                        sizes[i] = sizes[i] + 1
+                        nutrients = nutrients - 1.0/(max_size*Y)
                 
                 if sizes[i] >= max_size:
                     # We re-initialize all vectors that depend on Nb
                     states = np.append(states, 0)
-                    infection_time = np.append(infection_time, 0.0)
+                    first_infection_time = np.append(first_infection_time, 0.0)
                     Nt = np.append(Nt, 0)
                     sizes = np.append(sizes, 0)
+                    lysis_times = np.append(lysis_times,0.0)
                     
                     sizes[i] = 0
-                else: 
-                    if nutrients>0.0:
-                        sizes[i] = sizes[i] + 1
-                        nutrients = nutrients - 1.0/(max_size*Y)
 
 
 
@@ -140,7 +157,25 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
         n = n + 1
 
-    return time, phages, bacteria, nut
+    return time, phages, bacteria, nut, lysis_times, infection_times, infected_cell
 
 
+if __name__ == '__main__':
+    
+    delta_t = 0.01
+    Nb0 = 1000
+    B = 1.0e6
+    P = 1.0e8
+    N = 60
+    k = 6.0
+    nd = 30
+    nu = 5.0e-10
+    n0 = 1.0e7
 
+    # The doubling time in minutes
+    doubling_time_mins = 20.0
+    doubling_time = minutes_to_taul(doubling_time_mins, N, k)
+    
+    niter = 80000
+
+    time_vector, nphages, nbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
