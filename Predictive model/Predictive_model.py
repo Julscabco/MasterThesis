@@ -33,8 +33,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     states = np.zeros(Nb0, dtype=np.int64)
     first_infection_time = np.zeros(Nb0, dtype=np.float64)
     Nt = np.zeros(Nb0, dtype=np.int64)
-    infection_times = np.zeros(1, dtype=np.float64)
-    infected_cell = np.zeros(1, dtype=np.int64)
+    ninfect = np.zeros(Nb0, dtype = np.int64)
     lysis_times = np.zeros(Nb0, dtype=np.float64)
     
     sizes = np.zeros(Nb0,dtype=np.int64)
@@ -44,12 +43,16 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     # Initialization of vectors that grow with time steps
     time = []
     phages = []
-    bacteria = []
+    healthy_bacteria = []
+    infected_bacteria = []
+    dead_bacteria = []
     nut = []
 
 
     # We store the first values of the concentratioin of bacteria and phage
-    bacteria.append(float(Nb0))
+    healthy_bacteria.append(float(Nb0))
+    infected_bacteria.append(0.0)
+    dead_bacteria.append(0.0)
     phages.append(float(Np0))
     nut.append(nutrients)
 
@@ -90,8 +93,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
             elif prob_new_timer < r < prob_new_timer + prob_infection:
                 
-                infection_times = np.append(infection_times,t)
-                infected_cell = np.append(infected_cell,ii)
+                ninfect[ii] += 1
                 
                 if Np > 0:
                     Np = Np - 1
@@ -127,8 +129,8 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 Np = Np - 1
                 # We store their infection time
                 first_infection_time[i] = t
-                infection_times = np.append(infection_times,t)
-                infected_cell = np.append(infected_cell,i)
+                ninfect[i] += 1
+
 
             elif prob_infection< r < (prob_infection + prob_growth):
                 
@@ -144,6 +146,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                     Nt = np.append(Nt, 0)
                     sizes = np.append(sizes, 0)
                     lysis_times = np.append(lysis_times,0.0)
+                    ninfect = np.append(ninfect, 0)
                     
                     sizes[i] = 0
 
@@ -152,12 +155,14 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         t = t + delta_t
         phages.append((Np))
         time.append(t)
-        bacteria.append((len(np.where(states == 0)[0]) + len(np.where(states == 1)[0])))
+        healthy_bacteria.append(len(np.where(states == 0)[0]))
+        infected_bacteria.append(len(np.where(states == 1)[0]))
+        dead_bacteria.append(len(np.where(states == 2)[0]))
         nut.append((nutrients))
 
         n = n + 1
 
-    return time, phages, bacteria, nut, lysis_times, infection_times, infected_cell
+    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, lysis_times, ninfect
 
 
 if __name__ == '__main__':
@@ -178,4 +183,4 @@ if __name__ == '__main__':
     
     niter = 80000
 
-    time_vector, nphages, nbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)

@@ -20,8 +20,8 @@ from Predictive_model import system_evolution_nlg
 
 delta_t = 0.01
 values_Nb0 = [1000]
-values_B = [1.0e5,1.0e6]
-values_P = [1.0e5,1.0e6,1.0e7,1.0e8]
+values_B = [1.0e6]
+values_P = [1.0e8]
 N = 60
 k = 6.0
 nd = 30
@@ -53,7 +53,7 @@ if not os.path.exists(folder_path):
 """------------ NUMBA COMPILATION -------------"""
 # We call the function with just one iteration so that numba does the compilation
 niter = 1
-_, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, niter)
+_, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, niter)
 
 print('Numba compilation done')
 
@@ -69,7 +69,7 @@ for combination in param_combinations:
     
     Nb0,B,P,n0 = combination
 
-    time_vector, nphages, nbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
     total_time = pytime.time()-start
     
 
@@ -110,17 +110,19 @@ for combination in param_combinations:
         f.writerow([])
 
         f.writerow(['DATA FROM SIMULATION'])
-        f.writerow(['Time (hours)','Number of phage','Number of bacteria', 'Number of nutrients'])
+        f.writerow(['Time (hours)','Number of phage','Number of healthy bacteria','Number of infected bacteria','Number of dead bacteria', 'Number of nutrients'])
         f.writerow(['---'])
     
         for i in range(0,niter):
-            f.writerow([time_hours[i],nphages[i],nbacteria[i],nnutrients[i]])
+            f.writerow([time_hours[i],nphages[i],nhbacteria[i],nibacteria[i],ndbacteria[i],nnutrients[i]])
         
         f.writerow(['---'])
-        f.writerow(['Tau (mins)','Number of infections'])
+        f.writerow(['Tau (mins)'])
         f.writerow(['---'])
         for i in range(1, len(lysist)):
             f.writerow([lysist[i],ninfect[i]])
+            
+        
 
         ncomb += 1
         
