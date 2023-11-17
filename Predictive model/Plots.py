@@ -15,11 +15,12 @@ import csv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
 from Utils import nutrient_integral
 
 
-simulation_id = 44
+simulation_id = 59
 folder_name = 'Simulation'+'_'+str(simulation_id)
 storage_directory = os.path.join(os.getcwd(),os.path.join('RESULTS',folder_name))
 
@@ -61,7 +62,10 @@ save_plot_4 = False
 """ ------ PLOT 5 CONFIG ------ """
 
 plot_5 = True
-save_plot_5 = False
+save_plot_5 = True
+
+parameters_in_title_5 = ['B','P','n0']
+parameters_symbols_5 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$']
 
 
 """ ------- FILE READING --------"""
@@ -115,6 +119,7 @@ for filename in os.listdir(storage_directory):
         nibacteria = []
         ndbacteria = []
         nnutrients = []
+        firstinfect = []
         lysist = []
         ninfect = []
     
@@ -145,9 +150,10 @@ for filename in os.listdir(storage_directory):
             if '---' in row:
                 break
             else:
-                l,inf = row
+                fi,l,inf = row
                 lysist.append(float(l))
                 ninfect.append(int(inf))
+                firstinfect.append(float(fi))
         
 
 
@@ -157,6 +163,7 @@ for filename in os.listdir(storage_directory):
     nibacteria = np.array(nibacteria)
     ndbacteria = np.array(ndbacteria)
     nnutrients = np.array(nnutrients)
+    firstinfect = np.array(firstinfect)
     lysist = np.array(lysist)
     ninfect = np.array(ninfect)
 
@@ -313,12 +320,36 @@ if plot_5 == True:
     
     dead_cells_indices = np.where(lysist!=0.0)
     
+    first_infections = firstinfect[dead_cells_indices]
+    norm = Normalize(vmin=np.min(first_infections),vmax=np.max(first_infections))
+    
+    title = ''
+    for i in range(0,len(parameters_in_title_5)):
+        title += str(parameters_symbols_5[i])
+        value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_5[i]])[0]
+        title += "%.2e"%float(value)
+        title += ', '
+    
+    
     fig5, ax5 = plt.subplots()
-    ax5.scatter(lysist[dead_cells_indices],ninfect[dead_cells_indices])
+    scatter = ax5.scatter(lysist[dead_cells_indices],ninfect[dead_cells_indices],
+                c=first_infections,cmap='plasma',norm=norm,marker='o',alpha=0.7)
     ax5.set_xlabel('Time from first infection until lysis (min)',fontsize=12)
     ax5.set_ylabel('Multiplicity of superinfection (MOSI)',fontsize=12)
+    ax5.set_title(title)
+    
+    cbar = plt.colorbar(scatter, ax=ax5)
+    cbar.set_label('Time of Initial Infection')
     
     
+    
+    if save_plot_5 == True:
+        figure_name = 'P5_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
+        fig5.savefig(os.path.join(destiny_directory, figure_name))
+    
+        print("Plot 5 saved as:",figure_name)
+    
+
     
             
     

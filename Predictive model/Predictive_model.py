@@ -14,7 +14,7 @@ from Utils import get_linear_burst, monod_growth_law, minutes_to_taul, taul_to_m
 
 
 @numba.njit
-def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter):
+def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter, constant_nutrients=False):
     # Volume of the system
     V = np.float64(Nb0 / B)
 
@@ -83,8 +83,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
             if r < prob_new_timer:
                 Nt[ii] += np.int8(1)
                 if Nt[ii] >= N:
-                    tau = t - first_infection_time[ii]
-                    tau_mins = taul_to_minutes(tau,N,k)
+                    tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
                     Np = Np + int(get_linear_burst(tau_mins, 15.0, 10.0))
                     states[ii] = 2
                     
@@ -128,7 +127,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 states[i] = 1
                 Np = Np - 1
                 # We store their infection time
-                first_infection_time[i] = t
+                first_infection_time[i] = taul_to_minutes(t,N,k)
                 ninfect[i] += 1
 
 
@@ -137,7 +136,8 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 if sizes[i] < max_size: 
                     if nutrients>0.0:
                         sizes[i] = sizes[i] + 1
-                        nutrients = nutrients - 1.0/(max_size*Y)
+                        if constant_nutrients==False:
+                            nutrients = nutrients - 1.0/(max_size*Y)
                 
                 if sizes[i] >= max_size:
                     # We re-initialize all vectors that depend on Nb
@@ -162,7 +162,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
         n = n + 1
 
-    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, lysis_times, ninfect
+    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, first_infection_time, lysis_times, ninfect
 
 
 if __name__ == '__main__':
@@ -183,4 +183,4 @@ if __name__ == '__main__':
     
     niter = 80000
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
