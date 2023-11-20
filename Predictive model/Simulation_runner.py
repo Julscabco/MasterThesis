@@ -25,8 +25,8 @@ values_P = [1.0e9]
 N = 60
 k = 6.0
 nd = 30
-nu = 5.0e-10
-values_n0 = [1.0e5]
+nu = 5.0e-11
+values_n0 = [1.0e8]
 
 # The doubling time in minutes
 doubling_time_mins = 20.0
@@ -53,13 +53,13 @@ if not os.path.exists(folder_path):
 """------------ NUMBA COMPILATION -------------"""
 # We call the function with just one iteration so that numba does the compilation
 niter = 1
-_, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, niter)
+_, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, niter)
 
 print('Numba compilation done')
 
 
 """ ---------- ACTUAL SIMULATION ------------- """
-niter = 50000
+niter = 10000
 start = pytime.time()
 
 param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0))
@@ -69,7 +69,7 @@ for combination in param_combinations:
     
     Nb0,B,P,n0 = combination
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter, constant_nutrients=True)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter, constant_nutrients=False, allow_reinfection=False)
     total_time = pytime.time()-start
     
 
@@ -110,11 +110,11 @@ for combination in param_combinations:
         f.writerow([])
 
         f.writerow(['DATA FROM SIMULATION'])
-        f.writerow(['Time (hours)','Number of phage','Number of healthy bacteria','Number of infected bacteria','Number of dead bacteria', 'Number of nutrients'])
+        f.writerow(['Time (hours)','Number of phage','Number of healthy bacteria','Number of infected bacteria','Number of dead bacteria', 'Number of nutrients', 'Average MOSI'])
         f.writerow(['---'])
     
         for i in range(0,niter):
-            f.writerow([time_hours[i],nphages[i],nhbacteria[i],nibacteria[i],ndbacteria[i],nnutrients[i]])
+            f.writerow([time_hours[i],nphages[i],nhbacteria[i],nibacteria[i],ndbacteria[i],nnutrients[i], avg_ninfect[i]])
         
         f.writerow(['---'])
         f.writerow(['Time of first infection(mins)','Tau (mins)', 'MOSI'])
