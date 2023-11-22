@@ -14,7 +14,7 @@ from Utils import get_linear_burst, monod_growth_law, minutes_to_taul, taul_to_m
 
 
 @numba.njit
-def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter, constant_nutrients=False, allow_reinfection=True):
+def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, twindow, Nimax, niter, constant_nutrients=False, allow_reinfection=True):
     # Volume of the system
     V = np.float64(Nb0 / B)
 
@@ -35,6 +35,14 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     Nt = np.zeros(Nb0, dtype=np.int64)
     ninfect = np.zeros(Nb0, dtype = np.int64)
     lysis_times = np.zeros(Nb0, dtype=np.float64)
+    
+    # calculate number of iterations corresponding to time window
+    iter_window = int(twindow/delta_t)
+    std_nimax = Nimax / 3.2
+
+    # Create a matrix with size (number of bacteria, number of iterations)
+    last_infections = np.zeros((Nb0,iter_window), dtype=np.int64)
+    
     
     sizes = np.zeros(Nb0,dtype=np.int64)
     for j in range(0,Nb0):
@@ -58,7 +66,6 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
     nut.append(nutrients)
 
     
-
     # We initialize time
     t = 0.0
     time.append(t)
@@ -71,6 +78,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
     
     n = 0
+    
 
     while n<niter:
 
@@ -78,6 +86,10 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
         infected_indices = np.where(states == 1)[0]
         
         prob_infection = nu * delta_t * Np / V
+        
+        new_infections = np.zeros(len(ninfect),dtype=np.int64)
+        newborn_bacteria = 0
+
         
         for ii in infected_indices:
             r = np.random.rand()
@@ -94,17 +106,25 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
 
             elif prob_new_timer < r < prob_new_timer + prob_infection:
                 
-                ninfect[ii] += 1
+                if np.sum(last_infections[ii,:]) >= np.random.normal(loc=Nimax,scale=std_nimax):
+                    tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
+                    if allow_reinfection == True:
+                        Np = Np + int(get_linear_burst(tau_mins, 15.0, 10.0))
+                    states[ii] = 2
+                    lysis_times[ii] = tau_mins
+   
+                else:   
+                    new_infections[ii] = 1
                 
-                if Np > 0:
-                    Np = Np - 1
-                else:
-                    Np = 0
+                    if Np > 0:
+                        Np = Np - 1
+                    else:
+                        Np = 0
 
-                if Nt[ii] < nd:
-                    Nt[ii] = 0
-                elif Nt[ii] >= nd:
-                    Nt[ii] = Nt[ii] - nd
+                    if Nt[ii] < nd:
+                        Nt[ii] = 0
+                    elif Nt[ii] >= nd:
+                        Nt[ii] = Nt[ii] - nd
 
 
 
@@ -130,7 +150,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                 Np = Np - 1
                 # We store their infection time
                 first_infection_time[i] = taul_to_minutes(t,N,k)
-                ninfect[i] += 1
+                new_infections[i] = 1
 
 
             elif prob_infection< r < (prob_infection + prob_growth):
@@ -142,6 +162,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                             nutrients = nutrients - 1.0/(max_size*Y)
                 
                 if sizes[i] >= max_size:
+                    newborn_bacteria += 1
                     # We re-initialize all vectors that depend on Nb
                     states = np.append(states, 0)
                     first_infection_time = np.append(first_infection_time, 0.0)
@@ -152,6 +173,15 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, ni
                     
                     sizes[i] = 0
 
+        
+
+        last_infections = last_infections[:,1:]
+        # add the new infections array to the right of the matrix
+        last_infections = np.column_stack((last_infections,new_infections))
+        # add as many rows as new bacteria there are
+        last_infections = np.vstack((last_infections,np.zeros((newborn_bacteria,iter_window),dtype=np.int64)))
+        # We add the new infections that happened to ninfect
+        ninfect[:len(new_infections)-1] += new_infections
 
 
         t = t + delta_t
@@ -184,11 +214,16 @@ if __name__ == '__main__':
     nd = 30
     nu = 5.0e-10
     n0 = 1.0e7
-
-    # The doubling time in minutes
-    doubling_time_mins = 20.0
-    doubling_time = minutes_to_taul(doubling_time_mins, N, k)
+    Nimax = 10
     
-    niter = 80000
+    # time parameters in minutes
+    doubling_time_mins = 20.0
+    time_window_mins = 2.0
+    
+    # Time parameters in tau_l units
+    doubling_time = minutes_to_taul(doubling_time_mins, N, k)
+    time_window = minutes_to_taul(time_window_mins, N, k)
+    
+    niter = 50000
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninf, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninf, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, time_window, Nimax, niter)

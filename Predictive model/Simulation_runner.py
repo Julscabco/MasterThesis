@@ -25,12 +25,17 @@ values_P = [1.0e9]
 N = 60
 k = 6.0
 nd = 30
-nu = 5.0e-11
+nu = 5.0e-10
 values_n0 = [1.0e8]
+Nimax_values = [90]
 
-# The doubling time in minutes
+# time parameters in minutes
 doubling_time_mins = 20.0
+time_window_mins = 2.0
+
+# Time parameters in tau_l units
 doubling_time = minutes_to_taul(doubling_time_mins, N, k)
+time_window = minutes_to_taul(time_window_mins, N, k)
 
 """ ---------- WE FETCH THE NUMBER OF SIMULATION -------"""
 
@@ -53,23 +58,23 @@ if not os.path.exists(folder_path):
 """------------ NUMBA COMPILATION -------------"""
 # We call the function with just one iteration so that numba does the compilation
 niter = 1
-_, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, niter)
+_, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], values_P[0], N, k, nd, nu, values_n0[0], doubling_time, time_window, Nimax_values[0], niter)
 
 print('Numba compilation done')
 
 
 """ ---------- ACTUAL SIMULATION ------------- """
-niter = 10000
+niter = 20000
 start = pytime.time()
 
-param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0))
+param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0, Nimax_values))
 ncomb = 0
 
 for combination in param_combinations:
     
-    Nb0,B,P,n0 = combination
+    Nb0,B,P,n0,Nimax = combination
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, niter, constant_nutrients=False, allow_reinfection=False)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, time_window, Nimax, niter, constant_nutrients=False, allow_reinfection=True)
     total_time = pytime.time()-start
     
 
@@ -96,6 +101,7 @@ for combination in param_combinations:
         f.writerow(['Number of dead timer molecules when superinfected','nd', nd, '-'])
         f.writerow(['Adsorption rate of phage to bacteria','nu', nu, 'cells/min·ml'])
         f.writerow(['Initial concentration of nutrients','n0', n0, 'nutrient/ml'])
+        f.writerow(['Maximum infections one bacterium can handle','Nimax',Nimax,'-'])
 
         f.writerow([])
         f.writerow([])
@@ -125,6 +131,7 @@ for combination in param_combinations:
         
 
         ncomb += 1
+        print('Combination',str(ncomb),'done')
         
 print('Code lasted in', total_time, 'seconds')
 print('Simulation id:',counter)

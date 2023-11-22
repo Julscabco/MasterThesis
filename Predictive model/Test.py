@@ -1,11 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-vector = np.zeros((1,2))
-print(vector)
+# Shape has to be (number of cells, number of iterations in two minutes)
+matrix = np.zeros((4,2),dtype=np.int64)
+print(matrix)
 
-vector = np.append(vector,[[1.0,1.0]],axis = 0 )
-print(vector)
+matrix = matrix[:,1:]
+print(matrix)
 
-array = np.array([1,2,3,3,3,3])
-print(np.where(array==3))
+new_arra = np.zeros(4,dtype=np.int64)
+matrix = np.column_stack((matrix,new_arra))
+print(matrix)
