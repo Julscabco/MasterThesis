@@ -48,3 +48,9 @@ def nutrient_integral(gmax,B,n0,delta_t,tmax):
         time[ite] = time[ite-1] + delta_t
         
     return time,n,b
+
+
+
+
+
+
