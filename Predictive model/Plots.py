@@ -119,6 +119,14 @@ save_plot_10 = False
 parameters_in_title_10 = ['B','P','n0','Nimax']
 parameters_symbols_10 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
 
+"""-------- PLOT 11 CONFIG ------- """
+# Average total burst size as a function of time
+# total means due to membrane deterioration or because of lysis from within
+plot_11 = True
+save_plot_11 = False
+
+parameters_in_title_11 = ['B','P','n0','Nimax']
+parameters_symbols_11 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
 
 """ ----------- PLOTS THAT NEED DATA FROM VARIOUS RUNS FILES ------------ """
 
@@ -199,7 +207,7 @@ for filename in os.listdir(storage_directory):
         lysist = []
         ninfect = []
         avg_ninfect = []
-        collstates = []
+        avg_burst = []
     
         # Time-dependent data block
 
@@ -211,7 +219,7 @@ for filename in os.listdir(storage_directory):
             if '---' in row:
                 break
             else:
-                t,p,hb,ib,db,n,avg,bmd,bsmd = row
+                t,p,hb,ib,db,n,avg,avgb,bmd,bsmd = row
                 time.append(float(t))
                 nphages.append(float(p))
                 nhbacteria.append(float(hb))
@@ -219,6 +227,7 @@ for filename in os.listdir(storage_directory):
                 ndbacteria.append(float(db))
                 nnutrients.append(float(n))
                 avg_ninfect.append(float(avg))
+                avg_burst.append(float(avgb))
                 burstmd.append(float(bmd))
                 burstsizemd.append(float(bsmd))
 
@@ -237,20 +246,6 @@ for filename in os.listdir(storage_directory):
                 lysist.append(float(l))
                 ninfect.append(int(inf))
                 firstinfect.append(float(fi))
-        
-        # Collapse time bacteria information
-                
-        for row in csvreader:
-            if '---' in row:
-                break
-            
-            
-        for row in csvreader:
-            if '---' in row:
-                break
-            else:
-                ct = row[0]
-                collstates.append(float(ct))
         
 
     
@@ -542,33 +537,6 @@ for filename in os.listdir(storage_directory):
         
             print("Plot 6 saved as:",figure_name)
     
-     
-    """ PLOT 7: HISTOGRAM OF LAST INFECTION IN COLLAPSE TIME """
-    
-    if plot_7 == True:
-        
-        fig_hist7, ax_hist7 = plt.subplots(figsize=(10, 6))
-        
-        # Calculation and normamlization of the histogram
-        hist7, bins7 = np.histogram(collstates, bins=10)
-        bins7 = (bins7[1:] + bins7[:-1])/2.0
-        #binwidth7 = bins7[2]-bins7[1]
-        #hist7 = hist7/(len(collstates)*binwidth7)
-        
-        
-        ax_hist7.scatter(bins7, hist7)
-        ax_hist7.set_xlabel('Number of last infections at collapse time',fontsize=16)
-        ax_hist7.set_ylabel('Normalized frequency',fontsize=16)
-        plt.tick_params(axis='x', labelsize=14)
-        plt.tick_params(axis='y', labelsize=14)
-        
-        if save_plot_7 == True:
-            if not os.path.exists(destiny_directory):
-                os.mkdir(destiny_directory,0o666)
-            figure_name = 'P7_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
-            fig_hist7.savefig(os.path.join(destiny_directory, figure_name))
-        
-            print("Plot 7 saved as:",figure_name)
             
 
     """ PLOT 8: NUMBER OF BURSTS DUE TO MEMBRANE DETERIORATION VS TIME """
@@ -691,6 +659,39 @@ for filename in os.listdir(storage_directory):
             fig10.savefig(os.path.join(destiny_directory, figure_name))
         
             print("Plot 10 saved as:",figure_name) 
+            
+    
+    """ PLOT 11: AVERAGE OF TOTAL PHAGES BURST VS TIME """
+    
+    if plot_11 == True:
+        
+        fig11, ax11 = plt.subplots(figsize=(10,6))
+        
+        title = ''
+        for i in range(0,len(parameters_in_title_11)):
+            title += str(parameters_symbols_11[i])
+            value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_11[i]])[0]
+            title += "%.2e"%float(value)
+            title += ', '
+        
+        ax11.scatter(time, avg_burst, marker='o', color='green', s= np.ones(len(bacteria_concentration)))
+        ax11.set_xlabel('Time (h)', fontsize = 14)
+        ax11.set_ylabel('Average total  burst size', fontsize = 14)
+        ax11.set_title(title, fontsize=15)
+        
+        ax11.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
+        ax11.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+        
+        ax11.tick_params(axis='y', labelsize=14)
+        ax11.tick_params(axis='x', labelsize=12)
+        
+        if save_plot_11 == True:
+            if not os.path.exists(destiny_directory):
+                os.mkdir(destiny_directory,0o666)
+            figure_name = 'P11_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
+            fig11.savefig(os.path.join(destiny_directory, figure_name))
+        
+            print("Plot 11 saved as:",figure_name)
         
         
         

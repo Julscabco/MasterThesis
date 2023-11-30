@@ -14,7 +14,7 @@ from Utils import get_linear_burst, monod_growth_law, minutes_to_taul, taul_to_m
 
 
 @numba.njit
-def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, twindow, Nimax, Nimax_std, collapse_time, niter, constant_nutrients=False, allow_reinfection=True, time_window_track=True):
+def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, twindow, Nimax, Nimax_std, niter, constant_nutrients=False, allow_reinfection=True, time_window_track=True):
     # Volume of the system
     V = np.float64(Nb0 / B)
 
@@ -35,6 +35,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
     Nt = np.zeros(Nb0, dtype=np.int64)
     ninfect = np.zeros(Nb0, dtype = np.int64)
     lysis_times = np.zeros(Nb0, dtype=np.float64)
+    burst_size = np.zeros(Nb0, dtype=np.int64)
     
     # calculate number of iterations corresponding to time window
     iter_window = int(twindow/delta_t)
@@ -42,9 +43,6 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
     
     # Create a matrix with size (number of bacteria, number of iterations)
     last_infections = np.zeros((Nb0,iter_window), dtype=np.int64)
-    
-    # We calculate the iteration corresponding to the collapse
-    colliter = int(collapse_time/delta_t)
     
     
     sizes = np.zeros(Nb0,dtype=np.int64)
@@ -106,9 +104,9 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
                 if Nt[ii] >= N:
                     tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
                     if allow_reinfection == True:
-                        Np = Np + int(get_linear_burst(tau_mins, 15.0, 10.0))
+                        burst = int(get_linear_burst(tau_mins, 15.0, 10.0))
+                        Np = Np + burst
                     states[ii] = 2
-                    
                     lysis_times[ii] = tau_mins
                     
 
@@ -201,13 +199,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
         # add as many rows as new bacteria there are
         last_infections = np.vstack((last_infections,np.zeros((newborn_bacteria,iter_window),dtype=np.int64)))
 
-        # We keep the information of the last infections in the collapse iteration
-        if n == colliter:
-            m,_ = np.shape(last_infections)
-            collstates = np.zeros(1,dtype=np.int64)
-            for c in range(0,m):
-                if states[c] == 1:
-                    collstates = np.append(collstates, np.sum(last_infections[c,:]))
+        
 
         t = t + delta_t
         phages.append((Np))
@@ -227,7 +219,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
 
         n = n + 1
 
-    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, average_mosi, burst_events_md, burstsize_events_md, first_infection_time, lysis_times, ninfect, collstates
+    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, average_mosi, burst_events_md, burstsize_events_md, first_infection_time, lysis_times, ninfect
 
 
 if __name__ == '__main__':
@@ -257,4 +249,4 @@ if __name__ == '__main__':
     
     niter = 20000
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninf, burstmd, burstsizemd, firstinf, lysist, ninfect, collst = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, time_window, Nimax, Nimax/4.0, collapse_time, niter)
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninf, avg_burst, burstmd, burstsizemd, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, time_window, Nimax, Nimax/4.0, niter)

@@ -64,7 +64,7 @@ if not os.path.exists(folder_path):
 """------------ NUMBA COMPILATION -------------"""
 # We call the function with just one iteration so that numba does the compilation
 niter = 1
-_, _, _, _, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], 
+_, _, _, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], 
                                                     values_P[0], N, k, nd, nu, values_n0[0], doubling_time, 
                                                     time_window_values[0], Nimax_values[0], Nimax_std_values[0], collapse_time, niter)
 
@@ -82,9 +82,9 @@ for combination in param_combinations:
     
     Nb0,B,P,n0,Nimax,Nimax_std, time_window = combination
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, burstmd, burstsizemd, firstinf, lysist, ninfect, collstates = system_evolution_nlg(delta_t, Nb0, 
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, burstmd, burstsizemd, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, 
                                                                                                                                         B, P, N, k, nd, nu, n0, doubling_time, 
-                                                                                                                                        time_window, Nimax, Nimax_std, collapse_time, niter, 
+                                                                                                                                        time_window, Nimax, Nimax_std, niter, 
                                                                                                                                         constant_nutrients=False, allow_reinfection=True, time_window_track=True)
     total_time = pytime.time()-start
     
@@ -129,7 +129,7 @@ for combination in param_combinations:
         f.writerow([])
 
         f.writerow(['DATA FROM SIMULATION'])
-        f.writerow(['Time (hours)','Number of phage','Number of healthy bacteria','Number of infected bacteria','Number of dead bacteria', 'Number of nutrients', 'Average MOSI', 'Burst events due to MD'])
+        f.writerow(['Time (hours)','Number of phage','Number of healthy bacteria','Number of infected bacteria','Number of dead bacteria', 'Number of nutrients', 'Average MOSI', 'Burst events due to MD', 'Burst phages due to MD'])
         f.writerow(['---'])
     
         for i in range(0,niter):
@@ -141,11 +141,6 @@ for combination in param_combinations:
         for i in range(1, len(lysist)):
             f.writerow([firstinf[i],lysist[i],ninfect[i]])
         
-        f.writerow(['---'])
-        f.writerow(['Last infections at the time of collapse'])
-        f.writerow(['---'])
-        for i in range(0,len(collstates)):
-            f.writerow([collstates[i]])
             
         
 
