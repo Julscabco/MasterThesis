@@ -14,3 +14,10 @@ print(matrix)
 
 a = np.array([1,2,3,4,5])
 print(np.argmax(a>3))
+
+c = np.array([False,True,True,True,False])
+
+
+
+b = np.zeros(3)
+print(np.shape(b))
