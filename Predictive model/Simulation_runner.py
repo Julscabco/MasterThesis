@@ -28,20 +28,24 @@ k = 6.0
 nd = 30
 nu = 5.0e-10
 values_n0 = [1.0e8]
-Nimax_values = [90]
-Nimax_std_values = [i/3.2 for i in Nimax_values]
+Nimax_values = [10]
+Nimax_std_values = [2]
+
+# Constant burst size
+constant_burst = True
+ctburstsize_values = [0]
 
 # Collapse time in hours
-collapse_time_hours = 4.0
+#collapse_time_hours = 4.0
 
 # time parameters in minutes
 doubling_time_mins = 20.0
-time_window_mins_values = [2.0]
+time_window_mins_values = [2.5]
 
 # Time parameters in tau_l units
 doubling_time = minutes_to_taul(doubling_time_mins, N, k)
 time_window_values = [minutes_to_taul(i, N, k) for i in time_window_mins_values]
-collapse_time = minutes_to_taul((collapse_time_hours*60.0),N,k)
+#collapse_time = minutes_to_taul((collapse_time_hours*60.0),N,k)
 
 """ ---------- WE FETCH THE NUMBER OF SIMULATION -------"""
 
@@ -66,26 +70,28 @@ if not os.path.exists(folder_path):
 niter = 1
 _, _, _, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], 
                                                     values_P[0], N, k, nd, nu, values_n0[0], doubling_time, 
-                                                    time_window_values[0], Nimax_values[0], Nimax_std_values[0], collapse_time, niter)
+                                                    time_window_values[0], Nimax_values[0], Nimax_std_values[0], niter)
 
 print('Numba compilation done')
 
 
 """ ---------- ACTUAL SIMULATION ------------- """
-niter = 20000
+niter = 50000
 start = pytime.time()
 
-param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0, Nimax_values, Nimax_std_values, time_window_values))
+param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0, Nimax_values, time_window_values, ctburstsize_values))
 ncomb = 0
 
 for combination in param_combinations:
     
-    Nb0,B,P,n0,Nimax,Nimax_std, time_window = combination
+    Nb0,B,P,n0,Nimax,time_window,ctb = combination
+    Nimax_std = Nimax*0.2
 
     time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, burstmd, burstsizemd, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, 
                                                                                                                                         B, P, N, k, nd, nu, n0, doubling_time, 
                                                                                                                                         time_window, Nimax, Nimax_std, niter, 
-                                                                                                                                        constant_nutrients=False, allow_reinfection=True, time_window_track=True)
+                                                                                                                                        time_window_track=False, 
+                                                                                                                                        constant_burst=True, ctburstsize=ctb)
     total_time = pytime.time()-start
     
 
@@ -115,6 +121,8 @@ for combination in param_combinations:
         f.writerow(['Maximum infections one bacterium can handle','Nimax',Nimax,'-'])
         f.writerow(['Width of the maximum infection one bacterium can handle','Nimax_std',Nimax_std,'-'])
         f.writerow(['Time window to track maximum infections','time_window', time_window,'tau_l units'])
+        if constant_burst==True:
+            f.writerow(['Constant burst size','ctburstsize',ctb,'-'])
         
         f.writerow([])
         f.writerow([])

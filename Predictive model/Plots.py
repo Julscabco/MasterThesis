@@ -16,12 +16,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+from matplotlib.colors import LogNorm
 
 from Utils import nutrient_integral
 from Plot_Utils import *
 
 
-simulation_id = 170
+simulation_id = 287
 folder_name = 'Simulation'+'_'+str(simulation_id)
 storage_directory = os.path.join(os.getcwd(),os.path.join('RESULTS',folder_name))
 
@@ -50,14 +51,14 @@ parameters_symbols_2 = [r'${B}_{0}$',r'${N}_{0}$']
 
 """ ------ PLOT 3 CONFIG ------- """
 # Histogram of lysis times
-plot_3 = True
+plot_3 = False
 save_plot_3 = False
 
 
 """ ------ PLOT 4 CONFIG ------- """
 # Same as plot one but with extra info on dead, healthy and infected bacteria
 plot_4 = True
-save_plot_4 = False
+save_plot_4 = True
 
 logscale4 = True
 collapse_markers = True
@@ -77,7 +78,7 @@ parameters_symbols_5 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$']
 
 """ ------ PLOT 6 CONFIG ------- """
 # MOSI of infected cells as a function of time
-plot_6 = True
+plot_6 = False
 save_plot_6 = False
 
 parameters_in_title_6 = ['B','P','n0','Nimax']
@@ -94,7 +95,7 @@ parameters_symbols_7 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=
 
 """ ------- PLOT 8 CONFIG ------- """
 # Plot of the number of bursts due to MD as a function of time
-plot_8 = True
+plot_8 = False
 save_plot_8 = False
 
 parameters_in_title_8 = ['B','P','n0','Nimax']
@@ -102,7 +103,7 @@ parameters_symbols_8 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=
 
 """ ------- PLOT 9 CONFIG ------- """
 # Number of bursts due to Membrane Deterioration / number of infected bacteria vs time
-plot_9 = True
+plot_9 = False
 save_plot_9 = False
 
 zoom9 = False
@@ -113,7 +114,7 @@ parameters_symbols_9 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=
 
 """ ------- PLOT 10 CONFIG -------- """
 # Concentration of phage /concentration of bacteria vs time
-plot_10 = True
+plot_10 = False
 save_plot_10 = False
 
 parameters_in_title_10 = ['B','P','n0','Nimax']
@@ -128,6 +129,9 @@ save_plot_11 = False
 parameters_in_title_11 = ['B','P','n0','Nimax']
 parameters_symbols_11 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
 
+
+
+
 """ ----------- PLOTS THAT NEED DATA FROM VARIOUS RUNS FILES ------------ """
 
 
@@ -140,13 +144,36 @@ save_plot_01 = False
 parameters_in_title_01 = ['B','P','n0','Nimax']
 parameters_symbols_01 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
 
+""" ------- PLOT 02 CONFIG -------- """
+
+# Time and width of the collapse as a function of constant burst size
+plot_02 = True
+save_plot_02 = True
+
+parameters_in_title_02 = ['B','P']
+parameters_symbols_02 = [r'${B}_{0}=$',r'${P}_{0}=$']
+
+""" ------- PLOT 03 CONFIG -------- """
+
+# Minimum constant burst size needed for collapse for differen Nimax
+plot_03 = False
+save_plot_03 = False
+
+parameters_in_title_03 = ['B','P']
+parameters_symbols_03 = [r'${B}_{0}=$',r'${P}_{0}=$']
+
+
 
 
 """ ------- FILE READING --------"""
-# Empty arrays to cellct data
+# Empty arrays to collect data
+nimax_values = []
 Nimax_std = []
-collapse_times = []
-first_burst_md = []
+collapse_width = []
+collapse_time = []
+constant_burst = []
+
+minimum_burst_for_collapse = np.zeros((1,3), dtype=np.float64)
 
 for filename in os.listdir(storage_directory):
     complete_path = os.path.join(storage_directory,filename)
@@ -174,8 +201,9 @@ for filename in os.listdir(storage_directory):
                 i = i + 1
             else:
                 break
+            
+       
         
-
         for row in csvreader:
             if 'ADDITIONAL DATA FROM SIMULATION' in row:
                 break
@@ -207,7 +235,6 @@ for filename in os.listdir(storage_directory):
         lysist = []
         ninfect = []
         avg_ninfect = []
-        avg_burst = []
     
         # Time-dependent data block
 
@@ -219,7 +246,7 @@ for filename in os.listdir(storage_directory):
             if '---' in row:
                 break
             else:
-                t,p,hb,ib,db,n,avg,avgb,bmd,bsmd = row
+                t,p,hb,ib,db,n,avg,bmd,bsmd = row
                 time.append(float(t))
                 nphages.append(float(p))
                 nhbacteria.append(float(hb))
@@ -227,7 +254,6 @@ for filename in os.listdir(storage_directory):
                 ndbacteria.append(float(db))
                 nnutrients.append(float(n))
                 avg_ninfect.append(float(avg))
-                avg_burst.append(float(avgb))
                 burstmd.append(float(bmd))
                 burstsizemd.append(float(bsmd))
 
@@ -247,8 +273,6 @@ for filename in os.listdir(storage_directory):
                 ninfect.append(int(inf))
                 firstinfect.append(float(fi))
         
-
-    
     time = np.array(time)
     nphages = np.array(nphages)
     nhbacteria = np.array(nhbacteria)
@@ -258,14 +282,28 @@ for filename in os.listdir(storage_directory):
     firstinfect = np.array(firstinfect)
     lysist = np.array(lysist)
     ninfect = np.array(ninfect)
-    collstates = np.array(collstates)
     burstmd = np.array(burstmd)
     burstsizemd = np.array(burstsizemd)
     avg_ninfect = np.array(avg_ninfect)
     
     Nimax_std.append(float(np.array(df_parameters['Value'][df_parameters['Name in code']=='Nimax_std'])[0]))
-    collapse_times.append(get_collapse_time(time, (nibacteria + nhbacteria)))
+    
+    if plot_02 == True:
+        constant_burst.append(float(np.array(df_parameters['Value'][df_parameters['Parameter']=='Constant burst size'])[0]))
+        collapse_time.append(get_collapse_time(df_parameters, time, nhbacteria + nibacteria))
+        collapse_width.append(get_collapse_width(df_parameters, time, nhbacteria+nibacteria))
+        nimax_values.append(float(np.array(df_parameters['Value'][df_parameters['Name in code']=='Nimax'])[0]))
+    
 
+    if plot_03 == True:
+        array = []
+        array.append(float(np.array(df_parameters['Value'][df_parameters['Parameter']=='Constant burst size'])[0]))
+        array.append(float(np.array(df_parameters['Value'][df_parameters['Name in code']=='Nimax'])[0]))
+        array.append(exists_collapse(time,nhbacteria+nibacteria))
+        minimum_burst_for_collapse = np.row_stack((minimum_burst_for_collapse,array))
+        
+        
+        
     """---------PLOT 1: PHAGE, BACTERIA AND NUTRIENTS VS TIME --------"""
 
     if plot_1 == True  :
@@ -433,11 +471,13 @@ for filename in os.listdir(storage_directory):
         ax4[1].legend(loc='best',fontsize=16)
         
         if collapse_markers == True:
-            ax4[1].axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
-            ax4[1].axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
-            ax4[0].axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
-            ax4[0].axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+            ax4[1].axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
+            ax4[1].axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
+            ax4[0].axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
+            ax4[0].axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
     
+        ax4[0].set_xlim(0.0,3.0)
+        ax4[1].set_xlim(0.0,3.0)
        
         if logscale4 == True:
             ax4[0].set_yscale('log')
@@ -521,8 +561,8 @@ for filename in os.listdir(storage_directory):
         ax6.set_ylabel('<MOSI> of infected cells', fontsize = 14)
         ax6.set_title(title, fontsize=15)
         
-        ax6.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
-        ax6.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+        ax6.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
+        ax6.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
         
     
         ax6.tick_params(axis='y', labelsize=14)
@@ -545,7 +585,8 @@ for filename in os.listdir(storage_directory):
         
         fig8, ax8 = plt.subplots(figsize=(10,6))
         
-        norm = Normalize(vmin=np.min(burstsizemd),vmax=np.max(burstsizemd))
+        min_positive_value = np.min(burstsizemd[burstsizemd > 0])
+        norm = LogNorm(vmin=min_positive_value,vmax=np.max(burstsizemd))
         
         title = ''
         for i in range(0,len(parameters_in_title_8)):
@@ -559,8 +600,8 @@ for filename in os.listdir(storage_directory):
         ax8.set_ylabel('Number of bursts due to MD', fontsize = 14)
         ax8.set_title(title, fontsize=15)
         
-        ax8.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
-        ax8.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+        ax8.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
+        ax8.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
         
     
         ax8.tick_params(axis='y', labelsize=14)
@@ -568,6 +609,7 @@ for filename in os.listdir(storage_directory):
         
         cbar = plt.colorbar(scatter, ax=ax8)
         cbar.set_label('Total number of burst phages')
+
         
         
         if save_plot_8 == True:
@@ -601,8 +643,8 @@ for filename in os.listdir(storage_directory):
         ax9.set_ylabel('# bursts due to MD / # of infected bacteria ', fontsize = 10)
         ax9.set_title(title, fontsize=15)
         
-        ax9.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
-        ax9.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+        ax9.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
+        ax9.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
         
         ax9.tick_params(axis='y', labelsize=14)
         ax9.tick_params(axis='x', labelsize=12)
@@ -646,8 +688,8 @@ for filename in os.listdir(storage_directory):
         ax10.set_ylabel('B / P ', fontsize = 14)
         ax10.set_title(title, fontsize=15)
         
-        ax10.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
-        ax10.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
+        ax10.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
+        ax10.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
         
         ax10.tick_params(axis='y', labelsize=14)
         ax10.tick_params(axis='x', labelsize=12)
@@ -660,43 +702,7 @@ for filename in os.listdir(storage_directory):
         
             print("Plot 10 saved as:",figure_name) 
             
-    
-    """ PLOT 11: AVERAGE OF TOTAL PHAGES BURST VS TIME """
-    
-    if plot_11 == True:
-        
-        fig11, ax11 = plt.subplots(figsize=(10,6))
-        
-        title = ''
-        for i in range(0,len(parameters_in_title_11)):
-            title += str(parameters_symbols_11[i])
-            value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_11[i]])[0]
-            title += "%.2e"%float(value)
-            title += ', '
-        
-        ax11.scatter(time, avg_burst, marker='o', color='green', s= np.ones(len(bacteria_concentration)))
-        ax11.set_xlabel('Time (h)', fontsize = 14)
-        ax11.set_ylabel('Average total  burst size', fontsize = 14)
-        ax11.set_title(title, fontsize=15)
-        
-        ax11.axvline(x=get_collapse_time(time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
-        ax11.axvline(x=get_init_collapse_time(df_parameters,time,avg_ninfect), color='red', linestyle='dashed')
-        
-        ax11.tick_params(axis='y', labelsize=14)
-        ax11.tick_params(axis='x', labelsize=12)
-        
-        if save_plot_11 == True:
-            if not os.path.exists(destiny_directory):
-                os.mkdir(destiny_directory,0o666)
-            figure_name = 'P11_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
-            fig11.savefig(os.path.join(destiny_directory, figure_name))
-        
-            print("Plot 11 saved as:",figure_name)
-        
-        
-        
-            
-            
+
             
 
 """ ---- PLOTS THAT COMBINE DIFFERENT FILES FROM THE SIMULATION ----- """
@@ -729,10 +735,109 @@ if plot_01 == True:
     if save_plot_01 == True:
         if not os.path.exists(destiny_directory):
             os.mkdir(destiny_directory,0o666)
-        figure_name = 'P7_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
+        figure_name = 'P01_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
         fig01.savefig(os.path.join(destiny_directory, figure_name))
     
         print("Plot 01 saved as:",figure_name)
+        
+
+""" PLOT 02: TIME AND WIDTH OF COLLAPSE AS A FUNCTION OF CONSTANT BURST SIZE """
+
+if plot_02 == True:
+    
+    fig02, ax02 = plt.subplots(2,1,figsize=(6,10))
+    
+    constant_burst=np.array(constant_burst)
+    collapse_time = np.array(collapse_time)
+    collapse_width = np.array(collapse_width)
+    
+    nimax_unique = np.unique(nimax_values)
+    color_list = generate_colors(len(nimax_unique))
+
+    plot_width = []
+    plot_time = []
+    
+    title = ''
+    for i in range(0,len(parameters_in_title_02)):
+        title += str(parameters_symbols_02[i])
+        value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_02[i]])[0]
+        title += "%.2e"%float(value)
+        title += ', '
+    title += r'${\sigma}_{{N}_{imax}}=0.2·{N}_{imax}$'
+    
+    for j in range(0,len(nimax_unique)):
+        ind = (np.where(nimax_values==nimax_unique[j])[0])
+        ax02[0].scatter(constant_burst[ind], collapse_time[ind],label=r'${N}_{imax}=$'+str(nimax_unique[j]),color=color_list[j],linewidth=1.5)
+    ax02[0].set_ylabel('Collapse time (h)',fontsize=14)
+    ax02[0].set_title(title,fontsize=16)
+    ax02[0].legend(loc='best')
+    
+    for j in range(0,len(nimax_unique)):
+        index = (np.where(nimax_values==nimax_unique[j])[0])
+        ax02[1].scatter(constant_burst[index], collapse_width[index],label=r'${N}_{imax}=$'+str(nimax_unique[j]),color=color_list[j],linewidth=1)
+    ax02[1].set_xlabel('Burst size (constant)',fontsize=14)
+    ax02[1].set_ylabel('Collapse width (h)',fontsize=14)
+    ax02[1].legend()
+    
+    for axis in ax02:
+        axis.tick_params(axis='y', labelsize=14)
+        axis.tick_params(axis='x', labelsize=16)
+    
+    if save_plot_02 == True:
+        if not os.path.exists(destiny_directory):
+            os.mkdir(destiny_directory,0o666)
+        figure_name = 'P02_S'+str(simulation_id)+'.png'
+        fig02.savefig(os.path.join(destiny_directory, figure_name))
+    
+        print("Plot 02 saved as:",figure_name)
+    
+    
+    
+if plot_03 == True:
+    
+    fig03, ax03 = plt.subplots(figsize=(10,6))
+    
+    title = ''
+    for i in range(0,len(parameters_in_title_03)):
+        title += str(parameters_symbols_03[i])
+        value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_03[i]])[0]
+        title += "%.2e"%float(value)
+        title += ', '
+    
+    title += r'${\sigma}_{{N}_{imax}}=\frac{{N}_{imax}}{2}$'
+        
+    # Data analysis
+    minimum_burst_for_collapse = np.delete(minimum_burst_for_collapse, 0, axis= 0)
+    Nimax_values = np.unique(minimum_burst_for_collapse[:,1])
+    minburst = []
+    for i in Nimax_values:
+        indexes = np.where(minimum_burst_for_collapse[:,1]==i)[0]
+        bursts = minimum_burst_for_collapse[np.where(minimum_burst_for_collapse[indexes,2]==1.0)[0],0]
+        minburst.append(np.min(bursts))
+    
+    ax03.scatter(Nimax_values,minburst)
+    ax03.set_xlabel('Maxmimum infections per cell',fontsize=14)
+    ax03.set_ylabel('Minimum burst size for collapse',fontsize=14)
+    ax03.set_title(title, fontsize=16)
+    
+    ax03.tick_params(axis='y', labelsize=14)
+    ax03.tick_params(axis='x', labelsize=12)
+    
+    if save_plot_03 == True:
+        if not os.path.exists(destiny_directory):
+            os.mkdir(destiny_directory,0o666)
+        figure_name = 'P03_S'+str(simulation_id)+'.png'
+        fig03.savefig(os.path.join(destiny_directory, figure_name))
+    
+        print("Plot 03 saved as:",figure_name)
+
+    
+        
+    
+        
+    
+    
+    
 
 
 

@@ -43,13 +43,14 @@ r = img[:,:,0]
 g = img[:,:,1]
 b = img[:,:,2]
 
-fig, ax = plt.subplots(3,figsize=(15,6))
+fig, ax = plt.subplots(3,figsize=(10,10))
 ax[0].set_ylabel('Red channel')
 ax[0].imshow(r)
 ax[1].set_ylabel('Green channel')
 ax[1].imshow(g)
 ax[2].set_ylabel('Blue channel')
 ax[2].imshow(b)
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","Channels.png"))
 
 # We generates the mask that selects only the content inside the petri dish
 thresh = 110
@@ -71,10 +72,13 @@ cutmax = np.min([first_row_indexes[-1],last_row_indexes[-1]])
 
 r = r[:,cutmin:cutmax]
 
-
-io.imshow_collection([r,mask_r],cmap='gray')
-io.show()
-
+fig, ax = plt.subplots(1,2,figsize=(10,6))
+ax[0].imshow(mask_r)
+ax[0].set_title("Light mask")
+ax[1].set_title("Illuminated area selected")
+ax[1].imshow(r)
+plt.show()
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","SelectedArea.png"))
 
 # Viewing of the petri dish selected
 petri_dish = r
@@ -85,22 +89,43 @@ print(np.max(enhanced_image))
 print(np.min(enhanced_image))
 thresh = (enhanced_image<0.65)
 
-io.imshow_collection([r,thresh])
-io.show()
+fig, ax = plt.subplots(1,2,figsize=(10,6))
+ax[0].imshow(r)
+ax[0].set_title("Red channel")
+ax[1].imshow(thresh)
+ax[1].set_title("Binarized red channel")
+plt.show()
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","Binarization.png"))
 
 erosion = binary_erosion(thresh,footprint= np.ones((15,15)))
 
-io.imshow_collection([thresh,erosion])
-io.show()
+fig, ax = plt.subplots(1,2,figsize=(10,6))
+ax[0].imshow(thresh)
+ax[0].set_title("Binarized red channel")
+ax[1].imshow(erosion)
+ax[1].set_title("Binary erosion (15x15)")
+plt.show()
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","BinaryErosion.png"))
 
 dilated = binary_dilation(erosion,footprint=np.ones((20,20)))
 
-io.imshow_collection([thresh,dilated])
+fig, ax = plt.subplots(1,2,figsize=(10,6))
+ax[0].imshow(erosion)
+ax[0].set_title("Binary erosion (15x15)")
+ax[1].imshow(dilated)
+ax[1].set_title("Binary Dilation (20x20)")
+plt.show()
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","BinaryDilation.png"))
 
 label_image = label(dilated)
 
-plt.imshow(color.label2rgb(label_image, bg_label=0))
+fig, ax = plt.subplots(1,2,figsize=(10,6))
+ax[0].imshow(thresh)
+ax[0].set_title("Binarized red chanel")
+ax[1].imshow(label_image,cmap='rainbow')
+ax[1].set_title("Detected plaques")
 plt.show()
+fig.savefig(os.path.join(os.getcwd(),"PlotsDataScienceDep","PlaqueDetection.png"))
 
 binary_image = (label_image * 255).astype(np.uint8)
 

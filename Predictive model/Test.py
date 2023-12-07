@@ -12,8 +12,14 @@ new_arra = np.zeros(4,dtype=np.int64)
 matrix = np.column_stack((matrix,new_arra))
 print(matrix)
 
+new_arra2 = np.ones(2,dtype=np.int64)
+matrix = np.row_stack((matrix,new_arra2))
+print(matrix)
+
+
 a = np.array([1,2,3,4,5])
 print(np.argmax(a>3))
+
 
 c = np.array([False,True,True,True,False])
 

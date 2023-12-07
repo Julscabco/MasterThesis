@@ -14,7 +14,7 @@ from Utils import get_linear_burst, monod_growth_law, minutes_to_taul, taul_to_m
 
 
 @numba.njit
-def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, twindow, Nimax, Nimax_std, niter, constant_nutrients=False, allow_reinfection=True, time_window_track=True):
+def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, twindow, Nimax, Nimax_std, niter, time_window_track=True, constant_burst = False, ctburstsize=50.0):
     # Volume of the system
     V = np.float64(Nb0 / B)
 
@@ -35,7 +35,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
     Nt = np.zeros(Nb0, dtype=np.int64)
     ninfect = np.zeros(Nb0, dtype = np.int64)
     lysis_times = np.zeros(Nb0, dtype=np.float64)
-    burst_size = np.zeros(Nb0, dtype=np.int64)
+
     
     # calculate number of iterations corresponding to time window
     iter_window = int(twindow/delta_t)
@@ -103,9 +103,11 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
                 Nt[ii] += np.int8(1)
                 if Nt[ii] >= N:
                     tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
-                    if allow_reinfection == True:
+                    if constant_burst == False:
                         burst = int(get_linear_burst(tau_mins, 15.0, 10.0))
-                        Np = Np + burst
+                    elif constant_burst == True:
+                        burst = ctburstsize
+                    Np = Np + burst
                     states[ii] = 2
                     lysis_times[ii] = tau_mins
                     
@@ -117,12 +119,14 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
                 elif time_window_track == False:
                     relevant_infections = ninfect[ii]
                 
-                if  relevant_infections>= np.random.normal(loc=Nimax,scale=std_nimax):
+                if  relevant_infections>= np.random.uniform(low=Nimax-Nimax_std,high=Nimax+Nimax_std):
                     tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
-                    if allow_reinfection == True:
+                    if constant_burst==False:
                         burst = int(get_linear_burst(tau_mins, 15.0, 10.0))
-                        Np = Np + burst
-                        burstsize_md_counter += burst
+                    elif constant_burst == True:
+                        burst = ctburstsize
+                    Np = Np + burst
+                    burstsize_md_counter += burst
                     states[ii] = 2
                     lysis_times[ii] = tau_mins
                     burst_md_counter += 1
@@ -176,8 +180,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
                 if sizes[i] < max_size: 
                     if nutrients>0.0:
                         sizes[i] = sizes[i] + 1
-                        if constant_nutrients==False:
-                            nutrients = nutrients - 1.0/(max_size*Y)
+                        nutrients = nutrients - 1.0/(max_size*Y)
                 
                 if sizes[i] >= max_size:
                     newborn_bacteria += 1
