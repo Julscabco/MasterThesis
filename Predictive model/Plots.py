@@ -22,7 +22,7 @@ from Utils import nutrient_integral
 from Plot_Utils import *
 
 
-simulation_id = 287
+simulation_id = 360
 folder_name = 'Simulation'+'_'+str(simulation_id)
 storage_directory = os.path.join(os.getcwd(),os.path.join('RESULTS',folder_name))
 
@@ -42,7 +42,7 @@ parameters_symbols_1 = [r'${Nb}_{0}$', r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$'
 """ ------- PLOT 2 CONFIG ------ """
 # Plot of bacteria and nutrients vs time compared to theoretical integration
 # Phages should be 0 in that simulation
-plot_2 =    False
+plot_2 = False
 save_plot_2 = False
 
 parameters_in_title_2 = ['B','n0']
@@ -58,18 +58,18 @@ save_plot_3 = False
 """ ------ PLOT 4 CONFIG ------- """
 # Same as plot one but with extra info on dead, healthy and infected bacteria
 plot_4 = True
-save_plot_4 = True
+save_plot_4 = False
 
-logscale4 = True
+logscale4 = False
 collapse_markers = True
 
-parameters_in_title_4 = ['Nb0','B','P','n0','Nimax']
-parameters_symbols_4 = [r'${Nb}_{0}$', r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}$']
+parameters_in_title_4 = ['Nb0','B','P','Nimax']
+parameters_symbols_4 = [r'${Nb}_{0}$', r'${B}_{0}=$',r'${P}_{0}=$',r'${Ni}_{max}$']
 
 
 """ ------ PLOT 5 CONFIG ------ """
 # MOSI vs Lysis time with information of first infection time
-plot_5 = False
+plot_5 = True
 save_plot_5 = False
 
 parameters_in_title_5 = ['B','P','n0']
@@ -78,24 +78,26 @@ parameters_symbols_5 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$']
 
 """ ------ PLOT 6 CONFIG ------- """
 # MOSI of infected cells as a function of time
-plot_6 = False
+plot_6 = True
 save_plot_6 = False
 
 parameters_in_title_6 = ['B','P','n0','Nimax']
 parameters_symbols_6 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
 
 
-""" ------ PLOT 7 CONFIG ------- """
-# Histogram of infections in the time window at the time of the collapse
+
+"""------- PLOT 7 CONFIG --------- """
+
+# Average number of infections from infected cells in the time window
 plot_7 = False
 save_plot_7 = False
 
-parameters_in_title_7 = ['B','P','n0','Nimax']
-parameters_symbols_7 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
+parameters_in_title_7 = ['B','P','Nimax','time_window']
+parameters_symbols_7 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${Ni}_{max}=$',r'${\Delta t}_{w}=$']
 
 """ ------- PLOT 8 CONFIG ------- """
 # Plot of the number of bursts due to MD as a function of time
-plot_8 = False
+plot_8 = True
 save_plot_8 = False
 
 parameters_in_title_8 = ['B','P','n0','Nimax']
@@ -123,11 +125,13 @@ parameters_symbols_10 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}
 """-------- PLOT 11 CONFIG ------- """
 # Average total burst size as a function of time
 # total means due to membrane deterioration or because of lysis from within
-plot_11 = True
+plot_11 = False
 save_plot_11 = False
 
 parameters_in_title_11 = ['B','P','n0','Nimax']
 parameters_symbols_11 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}=$']
+
+
 
 
 
@@ -147,8 +151,8 @@ parameters_symbols_01 = [r'${B}_{0}=$',r'${P}_{0}=$',r'${N}_{0}=$',r'${Ni}_{max}
 """ ------- PLOT 02 CONFIG -------- """
 
 # Time and width of the collapse as a function of constant burst size
-plot_02 = True
-save_plot_02 = True
+plot_02 = False
+save_plot_02 = False
 
 parameters_in_title_02 = ['B','P']
 parameters_symbols_02 = [r'${B}_{0}=$',r'${P}_{0}=$']
@@ -235,6 +239,7 @@ for filename in os.listdir(storage_directory):
         lysist = []
         ninfect = []
         avg_ninfect = []
+        #window_ninfect = []
     
         # Time-dependent data block
 
@@ -254,6 +259,7 @@ for filename in os.listdir(storage_directory):
                 ndbacteria.append(float(db))
                 nnutrients.append(float(n))
                 avg_ninfect.append(float(avg))
+                #window_ninfect.append(float(wdw))
                 burstmd.append(float(bmd))
                 burstsizemd.append(float(bsmd))
 
@@ -285,6 +291,7 @@ for filename in os.listdir(storage_directory):
     burstmd = np.array(burstmd)
     burstsizemd = np.array(burstsizemd)
     avg_ninfect = np.array(avg_ninfect)
+    #window_ninfect = np.array(window_ninfect)
     
     Nimax_std.append(float(np.array(df_parameters['Value'][df_parameters['Name in code']=='Nimax_std'])[0]))
     
@@ -576,6 +583,43 @@ for filename in os.listdir(storage_directory):
             fig6.savefig(os.path.join(destiny_directory, figure_name))
         
             print("Plot 6 saved as:",figure_name)
+            
+    """ PLOT 7: AVERAGE INFECTIONS IN WINDOW """
+    
+    if plot_7 == True:
+        
+        fig7, ax7 = plt.subplots(figsize=(10,6))
+        
+        title = ''
+        for i in range(0,len(parameters_in_title_7)):
+            title += str(parameters_symbols_7[i])
+            value = np.array(df_parameters['Value'][df_parameters['Name in code']==parameters_in_title_7[i]])[0]
+            title += "%.2e"%float(value)
+            title += ', '
+            
+        
+        ax7.scatter(time, window_ninfect, marker='o', s = np.ones(len(time)))
+        ax7.set_xlabel('Time (h)', fontsize = 14)
+        ax7.set_ylabel('<MOSI> of infected cells in time window', fontsize = 14)
+        ax7.set_title(title, fontsize=15)
+        
+        #ax7.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='black', linestyle='dashed')
+        #ax7.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')
+        
+    
+        ax7.tick_params(axis='y', labelsize=14)
+        ax7.tick_params(axis='x', labelsize=16)
+        
+        
+        if save_plot_7 == True:
+            if not os.path.exists(destiny_directory):
+                os.mkdir(destiny_directory,0o666)
+            figure_name = 'P7_S'+str(simulation_id)+'_comb_'+str(ncomb)+'.png'
+            fig7.savefig(os.path.join(destiny_directory, figure_name))
+        
+            print("Plot 7 saved as:",figure_name)
+    
+    
     
             
 
@@ -599,6 +643,7 @@ for filename in os.listdir(storage_directory):
         ax8.set_xlabel('Time (h)', fontsize = 14)
         ax8.set_ylabel('Number of bursts due to MD', fontsize = 14)
         ax8.set_title(title, fontsize=15)
+        ax8.set_xlim(0.0,3.0)
         
         ax8.axvline(x=get_collapse_time(df_parameters,time,(nibacteria+nhbacteria)),color='black',linestyle='dashed')
         ax8.axvline(x=get_init_collapse_time(df_parameters,time,(nibacteria+nhbacteria)), color='red', linestyle='dashed')

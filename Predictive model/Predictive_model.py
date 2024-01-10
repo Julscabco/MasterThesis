@@ -57,6 +57,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
     dead_bacteria = []
     nut = []
     average_mosi = []
+    window_mosi = []
     burst_events_md = []
     burstsize_events_md = []
 
@@ -92,6 +93,8 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
         infected_indices = np.where(states == 1)[0]
         
         prob_infection = nu * delta_t * Np / V
+        if n==0: 
+            print(prob_infection)
         
         new_infections = np.zeros(len(ninfect),dtype=np.int64)
         newborn_bacteria = 0
@@ -119,7 +122,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
                 elif time_window_track == False:
                     relevant_infections = ninfect[ii]
                 
-                if  relevant_infections>= np.random.uniform(low=Nimax-Nimax_std,high=Nimax+Nimax_std):
+                if  relevant_infections>= np.random.uniform(low=Nimax-(Nimax_std/2.0),high=Nimax+(Nimax_std/2.0)):
                     tau_mins = taul_to_minutes(t,N,k) - first_infection_time[ii]
                     if constant_burst==False:
                         burst = int(get_linear_burst(tau_mins, 15.0, 10.0))
@@ -155,7 +158,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
         if alpha <= 0.0:
             alpha = 0.0
         
-        Y = 1.35
+        Y = 1.00
         # probability of growing
         prob_growth = alpha*delta_t*max_size*Y
     
@@ -177,12 +180,12 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
 
             elif prob_infection< r < (prob_infection + prob_growth):
                 
-                if sizes[i] < max_size: 
+                if sizes[i] < int(7): 
                     if nutrients>0.0:
                         sizes[i] = sizes[i] + 1
                         nutrients = nutrients - 1.0/(max_size*Y)
                 
-                if sizes[i] >= max_size:
+                if sizes[i] >= int(7):
                     newborn_bacteria += 1
                     # We re-initialize all vectors that depend on Nb
                     states = np.append(states, 0)
@@ -199,6 +202,11 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
         last_infections = last_infections[:,1:]
         # add the new infections array to the right of the matrix
         last_infections = np.column_stack((last_infections,new_infections))
+        alive_indices = np.hstack((infected_indices, non_infected_indices))
+        if len(alive_indices)>0:
+            window_mosi.append(np.mean(np.sum(last_infections[alive_indices,:],axis=1)))
+        else:
+            window_mosi.append(0.0)
         # add as many rows as new bacteria there are
         last_infections = np.vstack((last_infections,np.zeros((newborn_bacteria,iter_window),dtype=np.int64)))
 
@@ -222,7 +230,7 @@ def system_evolution_nlg(delta_t, Nb0, B, P, N, k, nd, nu, n0, doubling_time, tw
 
         n = n + 1
 
-    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, average_mosi, burst_events_md, burstsize_events_md, first_infection_time, lysis_times, ninfect
+    return time, phages, healthy_bacteria, infected_bacteria, dead_bacteria, nut, average_mosi, window_mosi, burst_events_md, burstsize_events_md, first_infection_time, lysis_times, ninfect
 
 
 if __name__ == '__main__':

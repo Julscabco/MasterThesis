@@ -9,14 +9,30 @@ import os
  
 import numpy as np
 
+def get_burst_size(t, tlim, a):
+    if t < tlim:
+        return 0.0
+    elif t >= tlim:
+        return a * t - a*tlim
 
-def Nb_bacteria_lysis_2(deltat, Nb, N=60, nd=33, k=6.0, MOSI=7.6, ti_superinfection=15.0,len_superinfection=3.0):
+
+def Nb_bacteria_lysis_2(deltat, Nb, n=60, nd=33, k=6.0, MOSI=7.6, ti_superinfection=15.0,len_superinfection=3.0):
     
     nu = 5e-9
+    B = 1.0e7
     
+    # Volume of the system
+    V = Nb/B
+
     
     # we calculate the initial concentration of phages according to the desired MOSI
     P0 = (MOSI*2.0e7)/(np.exp(-0.1*len_superinfection))
+    print(P0)
+    
+    # We calculate the corresponding number of phages
+    Np = int(P0*V)
+    print(Np)
+    
     
     prob_new_timer = deltat*k
     prob_superinfection = 0.0
@@ -26,8 +42,9 @@ def Nb_bacteria_lysis_2(deltat, Nb, N=60, nd=33, k=6.0, MOSI=7.6, ti_superinfect
     superinfection = False
     
     death_times = []
+
     
-    while any(Nt <= N):
+    while any(Nt <= n):
         if ti_superinfection<time<(ti_superinfection+len_superinfection) and superinfection == False:
             superinfection=True
 
@@ -64,47 +81,48 @@ def Nb_bacteria_lysis_2(deltat, Nb, N=60, nd=33, k=6.0, MOSI=7.6, ti_superinfect
             Nb = Nb - len(index)
             for i in range(0,len(index)):
                 death_times.append(time)
-        
+       
         
         time = time + delta_t
     
     
-    death_times = np.array(death_times)   
+    death_times = np.array(death_times)  
+
                       
     return death_times
             
         
  
-"""
 delta_t = 0.01
 ndata = 20000
-mosi = 7.6
+mosi = 0.4
 ti= 15.0
 length = 3.0
-k = 6.0
-n = 60
-nd = 33
+k = [2.0,4.0,6.0,8.0]
+N = 60
+nd =0
 Nb = 10000
 
-ff = ((float(n)/float(k)))/23.0
 
 
-
-t =  Nb_bacteria_lysis_2(deltat = delta_t, Nb = Nb, N = n, nd=nd, k = k, MOSI=mosi, ti_superinfection=ff*ti,len_superinfection=ff*length )
-
-
-output_file= str(delta_t)+'_'+str(Nb)+'_'+str(n)+'_'+str(int(k))+'_'+ str(nd)+'_'+str(mosi)+'_'+str(int(ti))+'_'+str(int(length))
-file_path = os.path.join(os.getcwd(),'CollectiveConstantInterval_data',output_file)
-print(output_file)
-
-f = open(file_path, "a")
-
-for i in range(0, len(t)):
+for i in range(0,len(k)):
     
-    f.write(str((1/ff)*t[i])+'\n')
+    ff = ((float(N)/float(k[i])))/23.0
+    t =  Nb_bacteria_lysis_2(deltat = delta_t, Nb = Nb, n = N, nd=nd, k = k[i], MOSI=mosi, ti_superinfection=ff*ti,len_superinfection=ff*length )
 
-f.close()
-"""
+
+    output_file= str(delta_t)+'_'+str(Nb)+'_'+str(N)+'_'+str(int(k[i]))+'_'+ str(nd)+'_'+str(mosi)+'_'+str(int(ti))+'_'+str(int(length))
+    file_path = os.path.join(os.getcwd(),os.path.join('Figure1ForOralPresentation','Prova3'),output_file)
+    print(output_file)
+
+    f = open(file_path, "w+")
+
+    for i in range(0, len(t)):
+    
+        f.write(str((1/ff)*t[i])+'\n')
+
+    f.close()
+
 
 
 def integrate_exponential(nu,B,initial_time,end_time):
@@ -195,7 +213,7 @@ def Nb_bacteria_lysis_3(deltat, Nb, N = 60,nd = 33,k = 6.0,MOSI=7.6, ti_superinf
     death_times = np.array(death_times)   
                       
     return death_times
-
+"""
 
 delta_t = 0.01
 ndata = 20000
@@ -227,5 +245,5 @@ for i in range(0, len(t)):
 
 f.close()
 
-
+"""
     

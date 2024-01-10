@@ -14,6 +14,7 @@ import numpy as np
 
 from Utils import taul_to_minutes, minutes_to_taul
 from Predictive_model import system_evolution_nlg
+from Predictive_model_LO import system_evolution_LO
 
 # Time units: tau_l = N/k = 23.0 minutes
 
@@ -27,12 +28,13 @@ N = 60
 k = 6.0
 nd = 30
 nu = 5.0e-10
+Nt_LOR = 10
 values_n0 = [1.0e8]
-Nimax_values = [10]
+Nimax_values = [50]
 Nimax_std_values = [2]
 
 # Constant burst size
-constant_burst = True
+constant_burst = False
 ctburstsize_values = [0]
 
 # Collapse time in hours
@@ -68,15 +70,15 @@ if not os.path.exists(folder_path):
 """------------ NUMBA COMPILATION -------------"""
 # We call the function with just one iteration so that numba does the compilation
 niter = 1
-_, _, _, _, _, _, _, _, _, _, _, _ = system_evolution_nlg(delta_t, values_Nb0[0], values_B[0], 
+_, _, _, _, _, _, _, _, _, _, _, _ = system_evolution_LO(delta_t, values_Nb0[0], values_B[0], 
                                                     values_P[0], N, k, nd, nu, values_n0[0], doubling_time, 
-                                                    time_window_values[0], Nimax_values[0], Nimax_std_values[0], niter)
+                                                    time_window_values[0], Nimax_values[0], Nimax_std_values[0], Nt_LOR, niter)
 
 print('Numba compilation done')
 
 
 """ ---------- ACTUAL SIMULATION ------------- """
-niter = 50000
+niter = 20000
 start = pytime.time()
 
 param_combinations = list(itertools.product(values_Nb0,values_B, values_P, values_n0, Nimax_values, time_window_values, ctburstsize_values))
@@ -87,15 +89,16 @@ for combination in param_combinations:
     Nb0,B,P,n0,Nimax,time_window,ctb = combination
     Nimax_std = Nimax*0.2
 
-    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, burstmd, burstsizemd, firstinf, lysist, ninfect = system_evolution_nlg(delta_t, Nb0, 
+    time_vector, nphages, nhbacteria, nibacteria, ndbacteria, nnutrients, avg_ninfect, burstmd, burstsizemd, firstinf, lysist, ninfect = system_evolution_LO(delta_t, Nb0, 
                                                                                                                                         B, P, N, k, nd, nu, n0, doubling_time, 
-                                                                                                                                        time_window, Nimax, Nimax_std, niter, 
+                                                                                                                                        time_window, Nimax, Nimax_std, Nt_LOR, niter, 
                                                                                                                                         time_window_track=False, 
-                                                                                                                                        constant_burst=True, ctburstsize=ctb)
+                                                                                                                                        constant_burst=constant_burst, ctburstsize=ctb)
     total_time = pytime.time()-start
     
 
     time_hours = [taul_to_minutes(t, N, k)/60.0 for t in time_vector]
+    time_window = taul_to_minutes(time_window,N,k)
 
     """ --------- STORAGE OF THE DATA IN A FILE --------- """
 
@@ -120,7 +123,7 @@ for combination in param_combinations:
         f.writerow(['Initial concentration of nutrients','n0', n0, 'nutrient/ml'])
         f.writerow(['Maximum infections one bacterium can handle','Nimax',Nimax,'-'])
         f.writerow(['Width of the maximum infection one bacterium can handle','Nimax_std',Nimax_std,'-'])
-        f.writerow(['Time window to track maximum infections','time_window', time_window,'tau_l units'])
+        f.writerow(['Time window to track maximum infections','time_window', time_window,'mins'])
         if constant_burst==True:
             f.writerow(['Constant burst size','ctburstsize',ctb,'-'])
         
